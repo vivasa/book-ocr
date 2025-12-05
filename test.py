@@ -3,10 +3,11 @@
 import requests
 
 # The URL of your local Docker container
-url = "http://localhost:8080/extract"
+# url = "http://localhost:8080/extract"
+url = "https://telugu-ocr-prod-777583762558.us-central1.run.app/extract"
 
 # Path to your local image
-image_path = "markandeya.png"  # Make sure this file exists
+image_path = "bgvd1.png"  # Make sure this file exists
 
 try:
     with open(image_path, "rb") as f:

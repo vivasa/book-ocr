@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import Sanscript from 'sanscript'
 import './App.css'
 
 const LANG_OPTIONS = [
@@ -16,6 +17,21 @@ function App() {
   const [error, setError] = useState('')
   const [text, setText] = useState('')
   const [copied, setCopied] = useState(false)
+  const [romanInput, setRomanInput] = useState('')
+  const [correctionCopied, setCorrectionCopied] = useState(false)
+
+  const teluguText = useMemo(() => {
+    const input = (romanInput || '').trim()
+    if (!input) return ''
+
+    // Default to ITRANS since it’s commonly used for Indian transliteration.
+    // Note: users may need to type explicit long vowels where necessary.
+    try {
+      return Sanscript.t(input, 'itrans', 'telugu')
+    } catch {
+      return ''
+    }
+  }, [romanInput])
 
   const canSubmit = useMemo(() => !!file && !isLoading, [file, isLoading])
 
@@ -55,6 +71,25 @@ function App() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
+  }
+
+  async function onCopyCorrection() {
+    try {
+      await navigator.clipboard.writeText(teluguText)
+      setCorrectionCopied(true)
+      window.setTimeout(() => setCorrectionCopied(false), 1200)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  function onAppendCorrection() {
+    if (!teluguText) return
+    setText((prev) => {
+      if (!prev) return teluguText
+      const needsSpace = prev.endsWith(' ') || prev.endsWith('\n')
+      return needsSpace ? `${prev}${teluguText}` : `${prev} ${teluguText}`
+    })
   }
 
   function onDownload() {
@@ -137,6 +172,30 @@ function App() {
                 Download .txt
               </button>
               <div className="meta">Characters: {text.length}</div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="cardTitle">Correction (English → Telugu)</div>
+            <input
+              className="input"
+              value={romanInput}
+              onChange={(e) => setRomanInput(e.target.value)}
+              placeholder="Type in English/romanized Telugu (ITRANS style)…"
+            />
+
+            <div className="output" aria-label="Telugu output">
+              {teluguText || <span className="muted">Telugu transliteration will appear here</span>}
+            </div>
+
+            <div className="actions">
+              <button className="secondary" disabled={!teluguText} onClick={onCopyCorrection}>
+                {correctionCopied ? 'Copied' : 'Copy Telugu'}
+              </button>
+              <button className="secondary" disabled={!teluguText} onClick={onAppendCorrection}>
+                Append to extracted text
+              </button>
+              <div className="meta">Characters: {teluguText.length}</div>
             </div>
           </div>
         </div>

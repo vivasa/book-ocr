@@ -109,6 +109,33 @@
   color: rgba(255, 255, 255, 0.92);
 }
 
+.input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.output {
+  margin-top: 10px;
+  width: 100%;
+  min-height: 64px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 20px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.muted {
+  opacity: 0.7;
+}
+
 .meta {
   margin-top: 8px;
   font-size: 12px;

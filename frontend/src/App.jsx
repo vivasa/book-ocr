@@ -12,6 +12,7 @@ const LANG_OPTIONS = [
 function App() {
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
+  const [zoom, setZoom] = useState(1)
   const [lang, setLang] = useState('tel')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -109,8 +110,21 @@ function App() {
     setFile(next)
     setText('')
     setError('')
+    setZoom(1)
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setPreviewUrl(next ? URL.createObjectURL(next) : null)
+  }
+
+  function zoomIn() {
+    setZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))
+  }
+
+  function zoomOut() {
+    setZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))
+  }
+
+  function zoomReset() {
+    setZoom(1)
   }
 
   return (
@@ -149,7 +163,27 @@ function App() {
           <div className="card">
             <div className="cardTitle">Image</div>
             {previewUrl ? (
-              <img className="preview" src={previewUrl} alt="preview" />
+              <div className="actions" style={{ marginTop: 0, marginBottom: 10 }}>
+                <button className="secondary" onClick={zoomOut} disabled={zoom <= 0.5}>
+                  −
+                </button>
+                <button className="secondary" onClick={zoomReset} disabled={zoom === 1}>
+                  Reset ({Math.round(zoom * 100)}%)
+                </button>
+                <button className="secondary" onClick={zoomIn} disabled={zoom >= 3}>
+                  +
+                </button>
+              </div>
+            ) : null}
+            {previewUrl ? (
+              <div className="previewFrame">
+                <img
+                  className="preview"
+                  style={{ transform: `scale(${zoom})` }}
+                  src={previewUrl}
+                  alt="preview"
+                />
+              </div>
             ) : (
               <div className="placeholder">Choose an image to preview</div>
             )}

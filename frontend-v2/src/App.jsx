@@ -81,6 +81,20 @@ function isImageFile(file) {
 }
 
 export default function App() {
+  const UI_STORAGE_KEYS = useMemo(
+    () => ({
+      rightPaneWidth: 'book-ocr:v2:rightPaneWidth',
+      editorFontSize: 'book-ocr:v2:editorFontSize',
+      lineHintRatio(projectId, pageId) {
+        return `book-ocr:v2:lineHintRatio:${projectId}:${pageId}`
+      },
+      editorSelection(projectId, pageId) {
+        return `book-ocr:v2:editorSelection:${projectId}:${pageId}`
+      },
+    }),
+    [],
+  )
+
   const theme = useMemo(
     () =>
       createTheme({
@@ -106,6 +120,7 @@ export default function App() {
 
   // UI-only state
   const [rightPaneWidth, setRightPaneWidth] = useState(420)
+  const [editorFontSize, setEditorFontSize] = useState(15)
   const [zoom, setZoom] = useState(1)
   const [lineHintRatio, setLineHintRatio] = useState(0)
   const draggingRef = useRef(false)
@@ -115,6 +130,7 @@ export default function App() {
   const editorRef = useRef(null)
   const saveTimerRef = useRef(0)
   const objectUrlsRef = useRef(new Set())
+  const editorSelectionSaveTimerRef = useRef(0)
 
   const selectedPage = useMemo(
     () => pages.find((p) => p.id === selectedPageId) ?? null,
@@ -418,6 +434,99 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(UI_STORAGE_KEYS.rightPaneWidth)
+      if (!raw) return
+      const n = Number.parseInt(raw, 10)
+      if (!Number.isFinite(n)) return
+      const next = Math.max(320, Math.min(820, n))
+      setRightPaneWidth(next)
+      dragStartWidthRef.current = next
+    } catch {
+      // ignore
+    }
+  }, [UI_STORAGE_KEYS])
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(UI_STORAGE_KEYS.rightPaneWidth, String(rightPaneWidth))
+      } catch {
+        // ignore
+      }
+    }, 120)
+    return () => window.clearTimeout(t)
+  }, [UI_STORAGE_KEYS, rightPaneWidth])
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(UI_STORAGE_KEYS.editorFontSize)
+      if (!raw) return
+      const n = Number.parseInt(raw, 10)
+      if (!Number.isFinite(n)) return
+      setEditorFontSize(Math.max(12, Math.min(24, n)))
+    } catch {
+      // ignore
+    }
+  }, [UI_STORAGE_KEYS])
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(UI_STORAGE_KEYS.editorFontSize, String(editorFontSize))
+      } catch {
+        // ignore
+      }
+    }, 120)
+    return () => window.clearTimeout(t)
+  }, [UI_STORAGE_KEYS, editorFontSize])
+
+  useEffect(() => {
+    if (!activeProject?.id || !selectedPageId) return
+    try {
+      const key = UI_STORAGE_KEYS.lineHintRatio(activeProject.id, selectedPageId)
+      const raw = window.localStorage.getItem(key)
+      const n = raw == null ? 0 : Number.parseFloat(raw)
+      setLineHintRatio(Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0)
+    } catch {
+      setLineHintRatio(0)
+    }
+  }, [UI_STORAGE_KEYS, activeProject?.id, selectedPageId])
+
+  useEffect(() => {
+    if (!activeProject?.id || !selectedPageId) return
+
+    let canceled = false
+    const key = UI_STORAGE_KEYS.editorSelection(activeProject.id, selectedPageId)
+
+    function tryRestore() {
+      if (canceled) return
+      const api = editorRef.current
+      if (!api?.setSelection) {
+        window.requestAnimationFrame(tryRestore)
+        return
+      }
+
+      try {
+        const raw = window.localStorage.getItem(key)
+        if (!raw) return
+        const parsed = JSON.parse(raw)
+        const anchor = Number(parsed?.anchor)
+        const head = Number(parsed?.head)
+        if (!Number.isFinite(anchor) || !Number.isFinite(head)) return
+        api.setSelection(anchor, head)
+      } catch {
+        // ignore
+      }
+    }
+
+    window.requestAnimationFrame(tryRestore)
+    return () => {
+      canceled = true
+    }
+  }, [UI_STORAGE_KEYS, activeProject?.id, selectedPageId, selectedPage?.correctedText, selectedPage?.ocrText])
+
+  useEffect(() => {
     function onPointerMove(e) {
       if (!draggingRef.current) return
       const dx = dragStartXRef.current - e.clientX
@@ -650,7 +759,16 @@ export default function App() {
                   page={selectedPage}
                   zoom={zoom}
                   lineHint={{ ratio: lineHintRatio }}
-                  onLineHintChange={(r) => setLineHintRatio(r)}
+                  onLineHintChange={(r) => {
+                    setLineHintRatio(r)
+                    if (!activeProject?.id || !selectedPageId) return
+                    try {
+                      const key = UI_STORAGE_KEYS.lineHintRatio(activeProject.id, selectedPageId)
+                      window.localStorage.setItem(key, String(r))
+                    } catch {
+                      // ignore
+                    }
+                  }}
                 />
               </div>
 
@@ -686,6 +804,35 @@ export default function App() {
                 Proofreading Dock
               </Typography>
               <Box sx={{ flex: 1 }} />
+              <Tooltip title="Decrease editor font">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => setEditorFontSize((s) => Math.max(12, s - 1))}
+                    disabled={editorFontSize <= 12}
+                    aria-label="Decrease editor font"
+                  >
+                    <Typography variant="caption" sx={{ fontWeight: 800 }}>
+                      A-
+                    </Typography>
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Chip size="small" label={`${editorFontSize}px`} />
+              <Tooltip title="Increase editor font">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => setEditorFontSize((s) => Math.min(24, s + 1))}
+                    disabled={editorFontSize >= 24}
+                    aria-label="Increase editor font"
+                  >
+                    <Typography variant="caption" sx={{ fontWeight: 800 }}>
+                      A+
+                    </Typography>
+                  </IconButton>
+                </span>
+              </Tooltip>
               <Chip size="small" label={`${rightPaneWidth}px`} />
             </Box>
             <Divider />
@@ -702,10 +849,21 @@ export default function App() {
                   placeholder="Run OCR, then proofread here."
                   disabled={!selectedPage}
                   height={420}
-                  onCursorLineChange={(lineNumber, totalLines) => {
-                    const denom = Math.max(1, (totalLines ?? 1) - 1)
-                    const ratio = denom <= 0 ? 0 : (Math.max(1, lineNumber ?? 1) - 1) / denom
-                    setLineHintRatio(ratio)
+                  fontSize={editorFontSize}
+                  onSelectionChange={(sel) => {
+                    if (!activeProject?.id || !selectedPageId) return
+                    window.clearTimeout(editorSelectionSaveTimerRef.current)
+                    editorSelectionSaveTimerRef.current = window.setTimeout(() => {
+                      try {
+                        const key = UI_STORAGE_KEYS.editorSelection(activeProject.id, selectedPageId)
+                        window.localStorage.setItem(
+                          key,
+                          JSON.stringify({ anchor: sel?.anchor, head: sel?.head }),
+                        )
+                      } catch {
+                        // ignore
+                      }
+                    }, 150)
                   }}
                 />
               </Box>

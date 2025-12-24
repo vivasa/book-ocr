@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
-import { EditorView } from '@codemirror/view'
+import { EditorView, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view'
+import { useTheme } from '@mui/material/styles'
 
 const transparentTheme = EditorView.theme({
   '&': {
@@ -13,27 +14,63 @@ function clamp(n, min, max) {
 }
 
 const ProofreadEditor = forwardRef(function ProofreadEditor(
-  { value, onChange, disabled, placeholder, height = 420, onCursorLineChange },
+  {
+    value,
+    onChange,
+    disabled,
+    placeholder,
+    height = 420,
+    onCursorLineChange,
+    onSelectionChange,
+    fontSize = 15,
+  },
   ref,
 ) {
+  const muiTheme = useTheme()
   const viewRef = useRef(null)
 
   const extensions = useMemo(() => {
     return [
       transparentTheme,
+      EditorView.theme({
+        '&': {
+          fontSize: `${fontSize}px`,
+        },
+        '.cm-line.cm-activeLine': {
+          backgroundColor: muiTheme.palette.action.selected,
+          fontWeight: 700,
+        },
+        '.cm-activeLineGutter': {
+          backgroundColor: muiTheme.palette.action.selected,
+        },
+      }),
       EditorView.lineWrapping,
       EditorView.editable.of(!disabled),
+      highlightActiveLine(),
+      highlightActiveLineGutter(),
       EditorView.updateListener.of((update) => {
-        if (!onCursorLineChange) return
         if (!update.selectionSet) return
-        const view = update.view
-        const pos = view.state.selection.main.head
-        const line = view.state.doc.lineAt(pos)
-        const total = view.state.doc.lines
-        onCursorLineChange(line.number, total)
+
+        if (onCursorLineChange) {
+          const view = update.view
+          const pos = view.state.selection.main.head
+          const line = view.state.doc.lineAt(pos)
+          const total = view.state.doc.lines
+          onCursorLineChange(line.number, total)
+        }
+
+        if (onSelectionChange) {
+          const sel = update.view.state.selection.main
+          onSelectionChange({
+            from: sel.from,
+            to: sel.to,
+            anchor: sel.anchor,
+            head: sel.head,
+          })
+        }
       }),
     ]
-  }, [disabled, onCursorLineChange])
+  }, [disabled, fontSize, muiTheme, onCursorLineChange, onSelectionChange])
 
   const handleChange = useCallback(
     (nextValue) => {
@@ -47,6 +84,16 @@ const ProofreadEditor = forwardRef(function ProofreadEditor(
     () => ({
       focus() {
         viewRef.current?.focus?.()
+      },
+      setSelection(anchor, head = anchor) {
+        const view = viewRef.current
+        if (!view) return false
+        const docLen = view.state.doc.length
+        const a = clamp(Number(anchor ?? 0), 0, docLen)
+        const h = clamp(Number(head ?? anchor ?? 0), 0, docLen)
+        view.dispatch({ selection: { anchor: a, head: h }, scrollIntoView: true })
+        view.focus()
+        return true
       },
       insertText(text) {
         const view = viewRef.current
@@ -87,7 +134,7 @@ const ProofreadEditor = forwardRef(function ProofreadEditor(
       basicSetup={{
         lineNumbers: true,
         foldGutter: false,
-        highlightActiveLine: false,
+        highlightActiveLine: true,
       }}
       extensions={extensions}
       onCreateEditor={(view) => {

@@ -20,6 +20,8 @@ export default function PageViewer({ page, zoom = 1, lineHint = null, onLineHint
   }
 
   const ratio = clamp01(lineHint?.ratio ?? 0)
+  const thumbHeight = 28
+  const thumbHalf = Math.round(thumbHeight / 2)
 
   return (
     <Box>
@@ -33,82 +35,97 @@ export default function PageViewer({ page, zoom = 1, lineHint = null, onLineHint
       </Box>
 
       <Box sx={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
-        <img
-          className="viewerImg"
-          style={{ transform: `scale(${zoom})` }}
-          src={page.previewUrl}
-          alt={`Page ${page.pageNumber}`}
-        />
+        {/* Scale the page and overlays together so the cue stays aligned when zooming. */}
+        <Box sx={{ position: 'relative', transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
+          <img className="viewerImg" src={page.previewUrl} alt={`Page ${page.pageNumber}`} />
 
-        <Box
-          className="lineRuler"
-          role="slider"
-          aria-label="Proofreading line indicator"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(ratio * 100)}
-          onPointerDown={(e) => {
-            if (!onLineHintChange) return
-            const el = e.currentTarget
-            el.setPointerCapture?.(e.pointerId)
-
-            const updateFromEvent = (evt) => {
-              const rect = el.getBoundingClientRect()
-              const y = evt.clientY - rect.top
-              const next = clamp01(y / rect.height)
-              onLineHintChange(next)
-            }
-
-            updateFromEvent(e)
-
-            const onMove = (evt) => updateFromEvent(evt)
-            const onUp = () => {
-              window.removeEventListener('pointermove', onMove)
-              window.removeEventListener('pointerup', onUp)
-            }
-            window.addEventListener('pointermove', onMove)
-            window.addEventListener('pointerup', onUp)
-          }}
-          sx={(t) => ({
-            position: 'absolute',
-            top: 8,
-            bottom: 8,
-            right: 8,
-            width: 22,
-            border: '1px solid',
-            borderColor: 'divider',
-            backgroundColor: t.palette.background.paper,
-            opacity: 0.7,
-            cursor: onLineHintChange ? 'ns-resize' : 'default',
-            userSelect: 'none',
-          })}
-        >
+          {/* Horizontal cue line across the page width */}
           <Box
             sx={(t) => ({
               position: 'absolute',
-              left: 2,
-              right: 2,
-              top: `calc(${Math.round(ratio * 1000) / 10}% - 6px)`,
-              height: 12,
+              left: 0,
+              right: 0,
+              top: `${Math.round(ratio * 1000) / 10}%`,
+              height: 2,
+              backgroundColor: t.palette.error.main,
+              opacity: 0.9,
+              pointerEvents: 'none',
+            })}
+          />
+
+          {/* Vertical ruler/scrollbar track with thumb handle */}
+          <Box
+            className="lineRuler"
+            role="slider"
+            aria-label="Proofreading line indicator"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(ratio * 100)}
+            onPointerDown={(e) => {
+              if (!onLineHintChange) return
+              const el = e.currentTarget
+              el.setPointerCapture?.(e.pointerId)
+
+              const updateFromEvent = (evt) => {
+                const rect = el.getBoundingClientRect()
+                const y = evt.clientY - rect.top
+                const next = clamp01(y / rect.height)
+                onLineHintChange(next)
+              }
+
+              updateFromEvent(e)
+
+              const onMove = (evt) => updateFromEvent(evt)
+              const onUp = () => {
+                window.removeEventListener('pointermove', onMove)
+                window.removeEventListener('pointerup', onUp)
+              }
+              window.addEventListener('pointermove', onMove)
+              window.addEventListener('pointerup', onUp)
+            }}
+            sx={(t) => ({
+              position: 'absolute',
+              top: 8,
+              bottom: 8,
+              right: 8,
+              width: 18,
               border: '1px solid',
-              borderColor: 'text.secondary',
-              backgroundColor: t.palette.action.hover,
-              boxSizing: 'border-box',
+              borderColor: 'divider',
+              backgroundColor: t.palette.background.paper,
+              opacity: 0.75,
+              cursor: onLineHintChange ? 'ns-resize' : 'default',
+              userSelect: 'none',
             })}
           >
             <Box
               sx={(t) => ({
                 position: 'absolute',
-                left: -7,
-                top: -1,
-                width: 0,
-                height: 0,
-                borderTop: '7px solid transparent',
-                borderBottom: '7px solid transparent',
-                borderRight: `7px solid ${t.palette.text.secondary}`,
-                opacity: 0.9,
+                left: 2,
+                right: 2,
+                top: `calc(${Math.round(ratio * 1000) / 10}% - ${thumbHalf}px)`,
+                height: thumbHeight,
+                border: '1px solid',
+                borderColor: 'divider',
+                backgroundColor: t.palette.action.selected,
+                boxSizing: 'border-box',
+                display: 'grid',
+                placeItems: 'center',
               })}
-            />
+            >
+              {/* Grip */}
+              <Box
+                sx={{
+                  width: 10,
+                  display: 'grid',
+                  gap: 2,
+                  opacity: 0.85,
+                }}
+              >
+                <Box sx={(t) => ({ height: 1, backgroundColor: t.palette.text.secondary })} />
+                <Box sx={(t) => ({ height: 1, backgroundColor: t.palette.text.secondary })} />
+                <Box sx={(t) => ({ height: 1, backgroundColor: t.palette.text.secondary })} />
+              </Box>
+            </Box>
           </Box>
         </Box>
       </Box>

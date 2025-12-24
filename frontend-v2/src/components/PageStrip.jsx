@@ -24,7 +24,7 @@ export default function PageStrip({ pages, selectedPageId, onSelectPage }) {
           key={p.id}
           selected={p.id === selectedPageId}
           onClick={() => onSelectPage?.(p.id)}
-          sx={{ borderRadius: 2, mb: 0.5 }}
+          sx={{ borderRadius: 0, mb: 0.5 }}
         >
           <ListItemAvatar>
             <Avatar variant="rounded" src={p.previewUrl} alt={`Page ${p.pageNumber}`} />

@@ -35,6 +35,7 @@ import {
 import PageStrip from './components/PageStrip.jsx'
 import PageViewer from './components/PageViewer.jsx'
 import TransliterationDock from './components/TransliterationDock.jsx'
+import ProofreadEditor from './components/ProofreadEditor.jsx'
 
 function nowMs() {
   return Date.now()
@@ -86,7 +87,7 @@ export default function App() {
         palette: {
           mode: 'dark',
         },
-        shape: { borderRadius: 12 },
+        shape: { borderRadius: 0 },
       }),
     [],
   )
@@ -106,11 +107,12 @@ export default function App() {
   // UI-only state
   const [rightPaneWidth, setRightPaneWidth] = useState(420)
   const [zoom, setZoom] = useState(1)
+  const [lineHintRatio, setLineHintRatio] = useState(0)
   const draggingRef = useRef(false)
   const dragStartXRef = useRef(0)
   const dragStartWidthRef = useRef(420)
 
-  const textareaRef = useRef(null)
+  const editorRef = useRef(null)
   const saveTimerRef = useRef(0)
   const objectUrlsRef = useRef(new Set())
 
@@ -121,6 +123,7 @@ export default function App() {
 
   useEffect(() => {
     setZoom(1)
+    setLineHintRatio(0)
   }, [selectedPageId])
 
   async function refreshProjects() {
@@ -461,7 +464,7 @@ export default function App() {
               </Typography>
 
               {projects.length === 0 ? (
-                <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 0 }}>
                   <Typography variant="body2">No projects yet. Create one to begin.</Typography>
                 </Box>
               ) : (
@@ -473,7 +476,7 @@ export default function App() {
                         p: 2,
                         border: '1px solid',
                         borderColor: 'divider',
-                        borderRadius: 2,
+                        borderRadius: 0,
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1.5,
@@ -582,17 +585,17 @@ export default function App() {
         {(banner || error || ocrPausedByQuota) && (
           <Box sx={{ px: 2, py: 1.5, display: 'grid', gap: 1 }}>
             {banner ? (
-              <Box sx={{ p: 1.25, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+              <Box sx={{ p: 1.25, border: '1px solid', borderColor: 'divider', borderRadius: 0 }}>
                 <Typography variant="body2">{banner}</Typography>
               </Box>
             ) : null}
             {error ? (
-              <Box sx={{ p: 1.25, border: '1px solid', borderColor: 'error.main', borderRadius: 2 }}>
+              <Box sx={{ p: 1.25, border: '1px solid', borderColor: 'error.main', borderRadius: 0 }}>
                 <Typography variant="body2">{error}</Typography>
               </Box>
             ) : null}
             {ocrPausedByQuota ? (
-              <Box sx={{ p: 1.25, border: '1px solid', borderColor: 'warning.main', borderRadius: 2 }}>
+              <Box sx={{ p: 1.25, border: '1px solid', borderColor: 'warning.main', borderRadius: 0 }}>
                 <Typography variant="body2">
                   OCR is paused due to quota. You can keep proofreading processed pages.
                 </Typography>
@@ -641,13 +644,18 @@ export default function App() {
               <Chip size="small" label={`${Math.round(zoom * 100)}%`} />
             </Box>
 
-            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 1.5 }}>
+            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 0, p: 1.5 }}>
               <div className="viewerFrame">
-                <PageViewer page={selectedPage} zoom={zoom} />
+                <PageViewer
+                  page={selectedPage}
+                  zoom={zoom}
+                  lineHint={{ ratio: lineHintRatio }}
+                  onLineHintChange={(r) => setLineHintRatio(r)}
+                />
               </div>
 
               {selectedPage?.lastError ? (
-                <Box sx={{ mt: 1.5, p: 1.25, border: '1px solid', borderColor: 'error.main', borderRadius: 2 }}>
+                <Box sx={{ mt: 1.5, p: 1.25, border: '1px solid', borderColor: 'error.main', borderRadius: 0 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                     Page error
                   </Typography>
@@ -683,18 +691,24 @@ export default function App() {
             <Divider />
 
             <Box sx={{ p: 1.5 }}>
-              <TextField
-                label="Corrected text"
-                multiline
-                minRows={10}
-                maxRows={26}
-                fullWidth
-                inputRef={textareaRef}
-                value={selectedPage ? selectedPage.correctedText ?? selectedPage.ocrText ?? '' : ''}
-                onChange={(e) => onEditorChange(e.target.value)}
-                placeholder="Run OCR, then proofread here."
-                disabled={!selectedPage}
-              />
+              <Typography variant="caption" sx={{ opacity: 0.85, display: 'block', mb: 0.75 }}>
+                Corrected text
+              </Typography>
+              <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 0, overflow: 'hidden' }}>
+                <ProofreadEditor
+                  ref={editorRef}
+                  value={selectedPage ? selectedPage.correctedText ?? selectedPage.ocrText ?? '' : ''}
+                  onChange={(next) => onEditorChange(next)}
+                  placeholder="Run OCR, then proofread here."
+                  disabled={!selectedPage}
+                  height={420}
+                  onCursorLineChange={(lineNumber, totalLines) => {
+                    const denom = Math.max(1, (totalLines ?? 1) - 1)
+                    const ratio = denom <= 0 ? 0 : (Math.max(1, lineNumber ?? 1) - 1) / denom
+                    setLineHintRatio(ratio)
+                  }}
+                />
+              </Box>
               <Typography variant="caption" sx={{ opacity: 0.75, display: 'block', mt: 1 }}>
                 Characters: {(selectedPage?.correctedText ?? selectedPage?.ocrText ?? '').length}
               </Typography>
@@ -703,26 +717,7 @@ export default function App() {
             <TransliterationDock
               onInsert={(teluguText) => {
                 if (!selectedPage) return
-                const el = textareaRef.current
-
-                const currentValue = selectedPage.correctedText ?? selectedPage.ocrText ?? ''
-                const start = el?.selectionStart ?? currentValue.length
-                const end = el?.selectionEnd ?? currentValue.length
-
-                const next = currentValue.slice(0, start) + teluguText + currentValue.slice(end)
-                onEditorChange(next)
-
-                // Restore focus + cursor to the editor after clicking the insert button.
-                requestAnimationFrame(() => {
-                  if (!el) return
-                  try {
-                    el.focus()
-                    const cursor = start + teluguText.length
-                    el.setSelectionRange(cursor, cursor)
-                  } catch {
-                    // ignore
-                  }
-                })
+                editorRef.current?.insertText?.(teluguText)
               }}
             />
           </div>

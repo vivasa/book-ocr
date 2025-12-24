@@ -43,6 +43,14 @@ htmlcov/
 # Docker
 *.log
 
+# Node / Frontend
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/.vite/
+**/.eslintcache
+**/*.local
+
 # Project specific
 *.png
 *.jpg

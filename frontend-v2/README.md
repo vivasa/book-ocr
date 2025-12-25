@@ -71,6 +71,13 @@ The transliteration card supports two workflows:
 	- Drag the handle to move the red line.
 	- Click anywhere on the page to move the red line to that click position.
 
+### 6.5) Language Help (Telugu)
+The center pane includes a **Language Help** tab (Telugu only for now).
+
+- Shows all Telugu consonants from the Telugu Unicode block (largest set), with script → roman hints.
+- Click any glyph to copy it to clipboard.
+- Includes a curated set of common conjuncts/clusters (click-to-copy).
+
 ### 7) Export
 - Export `.txt`: concatenates corrected text page-by-page (falls back to OCR text if not corrected).
 - Export JSON backup: saves project metadata + page text (note: **images are not embedded** in the JSON).
@@ -184,4 +191,41 @@ This is quota throttling from the OCR service.
 - The data is browser-local.
 - Different browsers / profiles / incognito sessions have separate storage.
 - Clearing site data resets IndexedDB + localStorage.
+
+---
+
+## TODO: Add Language Help for Kannada + Hindi
+
+This is intentionally deferred; the current implementation is Telugu-only.
+
+### 1) Unicode block + consonant extraction
+- Add Unicode helpers similar to `src/lib/teluguUnicode.js`.
+- **Kannada** block: `U+0C80..U+0CFF`.
+- **Devanagari (Hindi)** block: `U+0900..U+097F`.
+- For each script, enumerate code points in the block and select the largest consonant set by:
+	- keeping only `Script=<...>` + `Letter` characters
+	- excluding independent vowels + avagraha-type letters + vocalic letters (script-specific)
+	- documenting any exclusions inline so future changes are deliberate.
+
+### 2) Virama / halant handling for conjunct helpers
+- Telugu uses virama `U+0C4D`.
+- Kannada uses virama `U+0CCD`.
+- Devanagari uses halant `U+094D`.
+- Implement `make<Script>Conjunct(c1, c2)` for each, generating `c1 + virama + c2`.
+
+### 3) Transliteration scheme mapping
+- `LanguageHelpPane` currently uses Sanscript with `telugu`.
+- Add a mapping for script keys:
+	- Telugu: `telugu`
+	- Kannada: `kannada`
+	- Hindi: `devanagari`
+- Share the same scheme state used by the Transliteration dock so roman hints are consistent.
+
+### 4) English special-case (OCR confusion help)
+- Add a dedicated section for `lang === 'eng'` showing OCR confusions (O/0, I/l/1, rn/m, etc.).
+- Keep it copy-only (no insert).
+
+### 5) Performance + UI bounds
+- If you choose to implement exhaustive conjunct helpers later, note that a full pair grid grows as $n^2$.
+- A simpler alternative is a “conjunct builder” (pick C1 + C2, copy the result) to remain exhaustive without rendering $n^2$ tiles.
 

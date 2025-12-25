@@ -9,6 +9,8 @@ import {
   IconButton,
   MenuItem,
   Select,
+  Tab,
+  Tabs,
   TextField,
   ThemeProvider,
   Toolbar,
@@ -46,6 +48,7 @@ import {
 } from './storage/projectStore.js'
 import PageStrip from './components/PageStrip.jsx'
 import PageViewer from './components/PageViewer.jsx'
+import LanguageHelpPane from './components/LanguageHelpPane.jsx'
 import TransliterationDock from './components/TransliterationDock.jsx'
 import ProofreadEditor from './components/ProofreadEditor.jsx'
 
@@ -98,6 +101,8 @@ export default function App() {
       rightPaneWidth: 'book-ocr:v2:rightPaneWidth',
       editorFontSize: 'book-ocr:v2:editorFontSize',
       themeMode: 'book-ocr:v2:themeMode',
+      centerPaneTab: 'book-ocr:v2:centerPaneTab',
+      translitScheme: 'book-ocr:v2:translitScheme',
       lineHintRatio(projectId, pageId) {
         return `book-ocr:v2:lineHintRatio:${projectId}:${pageId}`
       },
@@ -109,6 +114,8 @@ export default function App() {
   )
 
   const [themeMode, setThemeMode] = useState('dark')
+  const [translitScheme, setTranslitScheme] = useState('itrans')
+  const [centerPaneTab, setCenterPaneTab] = useState('viewer')
 
   useEffect(() => {
     try {
@@ -123,6 +130,44 @@ export default function App() {
       // ignore
     }
   }, [UI_STORAGE_KEYS])
+
+  useEffect(() => {
+    try {
+      const raw = (window.localStorage.getItem(UI_STORAGE_KEYS.centerPaneTab) || '').trim()
+      if (raw === 'viewer' || raw === 'lang') {
+        setCenterPaneTab(raw)
+      }
+    } catch {
+      // ignore
+    }
+  }, [UI_STORAGE_KEYS])
+
+  useEffect(() => {
+    try {
+      const raw = (window.localStorage.getItem(UI_STORAGE_KEYS.translitScheme) || '').trim()
+      if (raw === 'itrans' || raw === 'hk' || raw === 'iast') {
+        setTranslitScheme(raw)
+      }
+    } catch {
+      // ignore
+    }
+  }, [UI_STORAGE_KEYS])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(UI_STORAGE_KEYS.centerPaneTab, String(centerPaneTab))
+    } catch {
+      // ignore
+    }
+  }, [UI_STORAGE_KEYS, centerPaneTab])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(UI_STORAGE_KEYS.translitScheme, String(translitScheme))
+    } catch {
+      // ignore
+    }
+  }, [UI_STORAGE_KEYS, translitScheme])
 
   useEffect(() => {
     try {
@@ -854,63 +899,98 @@ export default function App() {
 
           <div className="centerPane panel">
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                Page Viewer
-              </Typography>
+              <Tabs
+                value={centerPaneTab}
+                onChange={(_, v) => setCenterPaneTab(v)}
+                variant="standard"
+                sx={{ minHeight: 32, '& .MuiTab-root': { minHeight: 32, py: 0 } }}
+              >
+                <Tab value="viewer" label="Page Viewer" />
+                <Tab value="lang" label="Language Help" />
+              </Tabs>
               <Box sx={{ flex: 1 }} />
-              <Tooltip title="Zoom out">
-                <span>
-                  <IconButton onClick={() => setZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))} disabled={!selectedPage || zoom <= 0.5}>
-                    <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title="Reset zoom">
-                <span>
-                  <IconButton onClick={() => setZoom(1)} disabled={!selectedPage || zoom === 1}>
-                    <FontAwesomeIcon icon={faArrowsRotate} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title="Zoom in">
-                <span>
-                  <IconButton onClick={() => setZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))} disabled={!selectedPage || zoom >= 3}>
-                    <FontAwesomeIcon icon={faMagnifyingGlassPlus} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Chip size="small" label={`${Math.round(zoom * 100)}%`} />
+
+              {centerPaneTab === 'viewer' ? (
+                <>
+                  <Tooltip title="Zoom out">
+                    <span>
+                      <IconButton
+                        onClick={() =>
+                          setZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))
+                        }
+                        disabled={!selectedPage || zoom <= 0.5}
+                      >
+                        <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="Reset zoom">
+                    <span>
+                      <IconButton onClick={() => setZoom(1)} disabled={!selectedPage || zoom === 1}>
+                        <FontAwesomeIcon icon={faArrowsRotate} />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="Zoom in">
+                    <span>
+                      <IconButton
+                        onClick={() =>
+                          setZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))
+                        }
+                        disabled={!selectedPage || zoom >= 3}
+                      >
+                        <FontAwesomeIcon icon={faMagnifyingGlassPlus} />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Chip size="small" label={`${Math.round(zoom * 100)}%`} />
+                </>
+              ) : null}
             </Box>
 
             <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 0, p: 1.5 }}>
-              <div className="viewerFrame">
-                <PageViewer
-                  page={selectedPage}
-                  zoom={zoom}
-                  lineHint={{ ratio: lineHintRatio }}
-                  onLineHintChange={(r) => {
-                    setLineHintRatio(r)
-                    if (!activeProject?.id || !selectedPageId) return
-                    try {
-                      const key = UI_STORAGE_KEYS.lineHintRatio(activeProject.id, selectedPageId)
-                      window.localStorage.setItem(key, String(r))
-                    } catch {
-                      // ignore
-                    }
-                  }}
-                />
-              </div>
+              {centerPaneTab === 'viewer' ? (
+                <>
+                  <div className="viewerFrame">
+                    <PageViewer
+                      page={selectedPage}
+                      zoom={zoom}
+                      lineHint={{ ratio: lineHintRatio }}
+                      onLineHintChange={(r) => {
+                        setLineHintRatio(r)
+                        if (!activeProject?.id || !selectedPageId) return
+                        try {
+                          const key = UI_STORAGE_KEYS.lineHintRatio(activeProject.id, selectedPageId)
+                          window.localStorage.setItem(key, String(r))
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                    />
+                  </div>
 
-              {selectedPage?.lastError ? (
-                <Box sx={{ mt: 1.5, p: 1.25, border: '1px solid', borderColor: 'error.main', borderRadius: 0 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Page error
-                  </Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', opacity: 0.85 }}>
-                    {selectedPage.lastError}
-                  </Typography>
-                </Box>
-              ) : null}
+                  {selectedPage?.lastError ? (
+                    <Box
+                      sx={{
+                        mt: 1.5,
+                        p: 1.25,
+                        border: '1px solid',
+                        borderColor: 'error.main',
+                        borderRadius: 0,
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        Page error
+                      </Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', opacity: 0.85 }}>
+                        {selectedPage.lastError}
+                      </Typography>
+                    </Box>
+                  ) : null}
+                </>
+              ) : (
+                <LanguageHelpPane lang={lang} scheme={translitScheme} />
+              )}
             </Box>
           </div>
 
@@ -1006,6 +1086,8 @@ export default function App() {
 
             <TransliterationDock
               seedTelugu={translitSeedTelugu}
+              scheme={translitScheme}
+              onSchemeChange={setTranslitScheme}
               onInsert={(teluguText) => {
                 if (!selectedPage) return
                 editorRef.current?.insertText?.(teluguText)

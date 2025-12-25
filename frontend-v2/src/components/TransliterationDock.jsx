@@ -20,8 +20,16 @@ const SCHEMES = [
   { value: 'iast', label: 'IAST' },
 ]
 
-export default function TransliterationDock({ onInsert, seedRoman = '', seedTelugu = '' }) {
-  const [scheme, setScheme] = useState('itrans')
+export default function TransliterationDock({
+  onInsert,
+  seedRoman = '',
+  seedTelugu = '',
+  scheme: controlledScheme,
+  onSchemeChange,
+}) {
+  const [internalScheme, setInternalScheme] = useState('itrans')
+  const scheme = controlledScheme ?? internalScheme
+  const setScheme = onSchemeChange ?? setInternalScheme
   const [romanOverride, setRomanOverride] = useState('')
   const [romanOverrideSeedTelugu, setRomanOverrideSeedTelugu] = useState('')
   const [romanOverrideActive, setRomanOverrideActive] = useState(false)

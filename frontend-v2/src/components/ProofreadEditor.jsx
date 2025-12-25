@@ -35,6 +35,31 @@ const ProofreadEditor = forwardRef(function ProofreadEditor(
       EditorView.theme({
         '&': {
           fontSize: `${fontSize}px`,
+          fontFamily:
+            '"Timmana", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+          lineHeight: 1.55,
+        },
+        '.cm-scroller': {
+          fontFamily:
+            '"Timmana", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important',
+        },
+        '.cm-content': {
+          fontFamily:
+            '"Timmana", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important',
+          caretColor: muiTheme.palette.primary.main,
+        },
+        '.cm-cursor, .cm-dropCursor': {
+          borderLeftColor: muiTheme.palette.primary.main,
+        },
+        '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
+          backgroundColor: muiTheme.palette.action.selected,
+        },
+        '.cm-gutters': {
+          fontFamily:
+            '"Timmana", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important',
+          backgroundColor: muiTheme.palette.background.paper,
+          color: muiTheme.palette.text.secondary,
+          borderRightColor: muiTheme.palette.divider,
         },
         '.cm-line.cm-activeLine': {
           backgroundColor: muiTheme.palette.action.selected,
@@ -61,11 +86,13 @@ const ProofreadEditor = forwardRef(function ProofreadEditor(
 
         if (onSelectionChange) {
           const sel = update.view.state.selection.main
+          const selectedText = sel.from === sel.to ? '' : update.view.state.doc.sliceString(sel.from, sel.to)
           onSelectionChange({
             from: sel.from,
             to: sel.to,
             anchor: sel.anchor,
             head: sel.head,
+            selectedText,
           })
         }
       }),
@@ -130,7 +157,7 @@ const ProofreadEditor = forwardRef(function ProofreadEditor(
       height={typeof height === 'number' ? `${height}px` : height}
       editable={!disabled}
       placeholder={placeholder}
-      theme="dark"
+      theme={muiTheme.palette.mode === 'dark' ? 'dark' : 'light'}
       basicSetup={{
         lineNumbers: true,
         foldGutter: false,

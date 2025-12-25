@@ -16,10 +16,22 @@ import {
   Typography,
   createTheme,
 } from '@mui/material'
-import ZoomInIcon from '@mui/icons-material/ZoomIn'
-import ZoomOutIcon from '@mui/icons-material/ZoomOut'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
-import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+  faArrowLeft,
+  faArrowsRotate,
+  faFileArrowUp,
+  faFileExport,
+  faFileLines,
+  faFolderOpen,
+  faPlay,
+  faMagnifyingGlassMinus,
+  faMagnifyingGlassPlus,
+  faMoon,
+  faPlus,
+  faSun,
+  faTrash,
+} from '@fortawesome/free-solid-svg-icons'
 import { newId } from './lib/ids.js'
 import { pdfToPagePngBlobs } from './lib/pdfImport.js'
 import { ALLOWED_LANGS, extractText } from './lib/ocrApi.js'
@@ -85,6 +97,7 @@ export default function App() {
     () => ({
       rightPaneWidth: 'book-ocr:v2:rightPaneWidth',
       editorFontSize: 'book-ocr:v2:editorFontSize',
+      themeMode: 'book-ocr:v2:themeMode',
       lineHintRatio(projectId, pageId) {
         return `book-ocr:v2:lineHintRatio:${projectId}:${pageId}`
       },
@@ -95,16 +108,108 @@ export default function App() {
     [],
   )
 
-  const theme = useMemo(
-    () =>
-      createTheme({
-        palette: {
-          mode: 'dark',
+  const [themeMode, setThemeMode] = useState('dark')
+
+  useEffect(() => {
+    try {
+      const saved = (window.localStorage.getItem(UI_STORAGE_KEYS.themeMode) || '').trim()
+      if (saved === 'light' || saved === 'dark') {
+        setThemeMode(saved)
+        return
+      }
+      const prefersLight = window.matchMedia?.('(prefers-color-scheme: light)')?.matches
+      if (prefersLight) setThemeMode('light')
+    } catch {
+      // ignore
+    }
+  }, [UI_STORAGE_KEYS])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(UI_STORAGE_KEYS.themeMode, themeMode)
+    } catch {
+      // ignore
+    }
+  }, [UI_STORAGE_KEYS, themeMode])
+
+  const theme = useMemo(() => {
+    const isDark = themeMode === 'dark'
+    const divider = isDark ? '#555555' : '#D0D0D0'
+    return createTheme({
+      palette: {
+        mode: themeMode,
+        ...(isDark
+          ? {
+              // IntelliJ / Darcula-inspired palette (approximation).
+              background: { default: '#2B2B2B', paper: '#3C3F41' },
+              text: { primary: '#A9B7C6', secondary: '#808080' },
+              divider,
+              // Softer (pastel-ish) accents for a calmer UI.
+              primary: { main: '#7FA7FF' },
+              secondary: { main: '#C792EA' },
+              success: { main: '#8BD5A2' },
+              warning: { main: '#F2C97D' },
+              error: { main: '#F28B82' },
+              action: {
+                hover: 'rgba(255,255,255,0.06)',
+                selected: 'rgba(127,167,255,0.20)',
+                disabled: 'rgba(169,183,198,0.35)',
+                disabledBackground: 'rgba(255,255,255,0.04)',
+              },
+            }
+          : {
+              // IntelliJ light-inspired palette (approximation).
+              background: { default: '#F5F5F5', paper: '#FFFFFF' },
+              text: { primary: '#1F2328', secondary: '#5A5A5A' },
+              divider,
+              // Softer (pastel-ish) accents for a calmer UI.
+              primary: { main: '#5B8CFF' },
+              secondary: { main: '#B07AE6' },
+              success: { main: '#55B97C' },
+              warning: { main: '#E3B55B' },
+              error: { main: '#E77474' },
+              action: {
+                hover: 'rgba(0,0,0,0.04)',
+                selected: 'rgba(91,140,255,0.14)',
+                disabled: 'rgba(31,35,40,0.35)',
+                disabledBackground: 'rgba(0,0,0,0.03)',
+              },
+            }),
+      },
+      shape: { borderRadius: 0 },
+      components: {
+        MuiCssBaseline: {
+          styleOverrides: {
+            body: {
+              backgroundColor: isDark ? '#2B2B2B' : '#F5F5F5',
+              '--app-divider': divider,
+            },
+          },
         },
-        shape: { borderRadius: 0 },
-      }),
-    [],
-  )
+        MuiIconButton: {
+          styleOverrides: {
+            root: {
+              color: isDark ? '#A9B7C6' : '#5A5A5A',
+            },
+          },
+        },
+        MuiButton: {
+          styleOverrides: {
+            root: {
+              textTransform: 'none',
+            },
+          },
+        },
+        MuiChip: {
+          styleOverrides: {
+            root: {
+              borderRadius: 6,
+            },
+          },
+        },
+      },
+    })
+  }, [themeMode])
 
   const [view, setView] = useState('projects')
   const [projects, setProjects] = useState([])
@@ -123,6 +228,7 @@ export default function App() {
   const [editorFontSize, setEditorFontSize] = useState(15)
   const [zoom, setZoom] = useState(1)
   const [lineHintRatio, setLineHintRatio] = useState(0)
+  const [translitSeedTelugu, setTranslitSeedTelugu] = useState('')
   const draggingRef = useRef(false)
   const dragStartXRef = useRef(0)
   const dragStartWidthRef = useRef(420)
@@ -557,7 +663,15 @@ export default function App() {
               </Typography>
               <Chip size="small" label="no login" />
               <Box sx={{ flex: 1 }} />
-              <Button variant="contained" onClick={createProject}>
+              <Tooltip title={themeMode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}>
+                <IconButton
+                  onClick={() => setThemeMode((m) => (m === 'dark' ? 'light' : 'dark'))}
+                  aria-label="Toggle theme"
+                >
+                  <FontAwesomeIcon icon={themeMode === 'dark' ? faSun : faMoon} />
+                </IconButton>
+              </Tooltip>
+              <Button variant="contained" onClick={createProject} startIcon={<FontAwesomeIcon icon={faPlus} />}>
                 New project
               </Button>
             </Toolbar>
@@ -602,10 +716,10 @@ export default function App() {
                           Last updated: {new Date(p.updatedAt ?? p.createdAt).toLocaleString()}
                         </Typography>
                       </Box>
-                      <Button variant="outlined" onClick={() => openProject(p.id)}>
+                      <Button variant="outlined" onClick={() => openProject(p.id)} startIcon={<FontAwesomeIcon icon={faFolderOpen} />}>
                         Open
                       </Button>
-                      <Button color="error" variant="outlined" onClick={() => onDeleteProject(p.id)}>
+                      <Button color="error" variant="outlined" onClick={() => onDeleteProject(p.id)} startIcon={<FontAwesomeIcon icon={faTrash} />}>
                         Delete
                       </Button>
                     </Box>
@@ -636,7 +750,7 @@ export default function App() {
                   revokeAllObjectUrls()
                 }}
               >
-                <ArrowBackIcon />
+                <FontAwesomeIcon icon={faArrowLeft} />
               </IconButton>
             </Tooltip>
 
@@ -656,7 +770,7 @@ export default function App() {
               ))}
             </Select>
 
-            <Button variant="outlined" component="label">
+            <Button variant="outlined" component="label" startIcon={<FontAwesomeIcon icon={faFileArrowUp} />}>
               Import PDF/images
               <input
                 type="file"
@@ -667,7 +781,12 @@ export default function App() {
               />
             </Button>
 
-            <Button variant="contained" disabled={ocrRunning || pages.length === 0} onClick={() => runOcr()}>
+            <Button
+              variant="contained"
+              disabled={ocrRunning || pages.length === 0}
+              onClick={() => runOcr()}
+              startIcon={<FontAwesomeIcon icon={faPlay} />}
+            >
               {ocrRunning ? 'OCR…' : 'Run OCR (all)'}
             </Button>
 
@@ -675,16 +794,26 @@ export default function App() {
               variant="outlined"
               disabled={ocrRunning || !selectedPageId}
               onClick={() => runOcr({ onlySelected: true })}
+              startIcon={<FontAwesomeIcon icon={faPlay} />}
             >
               OCR (selected)
             </Button>
 
             <Box sx={{ flex: 1 }} />
 
-            <Button variant="outlined" disabled={pages.length === 0} onClick={exportTxt}>
+            <Tooltip title={themeMode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}>
+              <IconButton
+                onClick={() => setThemeMode((m) => (m === 'dark' ? 'light' : 'dark'))}
+                aria-label="Toggle theme"
+              >
+                <FontAwesomeIcon icon={themeMode === 'dark' ? faSun : faMoon} />
+              </IconButton>
+            </Tooltip>
+
+            <Button variant="outlined" disabled={pages.length === 0} onClick={exportTxt} startIcon={<FontAwesomeIcon icon={faFileLines} />}>
               Export .txt
             </Button>
-            <Button variant="outlined" disabled={pages.length === 0} onClick={exportJsonBackup}>
+            <Button variant="outlined" disabled={pages.length === 0} onClick={exportJsonBackup} startIcon={<FontAwesomeIcon icon={faFileExport} />}>
               Export JSON
             </Button>
           </Toolbar>
@@ -732,21 +861,21 @@ export default function App() {
               <Tooltip title="Zoom out">
                 <span>
                   <IconButton onClick={() => setZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))} disabled={!selectedPage || zoom <= 0.5}>
-                    <ZoomOutIcon />
+                    <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
                   </IconButton>
                 </span>
               </Tooltip>
               <Tooltip title="Reset zoom">
                 <span>
                   <IconButton onClick={() => setZoom(1)} disabled={!selectedPage || zoom === 1}>
-                    <RestartAltIcon />
+                    <FontAwesomeIcon icon={faArrowsRotate} />
                   </IconButton>
                 </span>
               </Tooltip>
               <Tooltip title="Zoom in">
                 <span>
                   <IconButton onClick={() => setZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))} disabled={!selectedPage || zoom >= 3}>
-                    <ZoomInIcon />
+                    <FontAwesomeIcon icon={faMagnifyingGlassPlus} />
                   </IconButton>
                 </span>
               </Tooltip>
@@ -851,6 +980,9 @@ export default function App() {
                   height={420}
                   fontSize={editorFontSize}
                   onSelectionChange={(sel) => {
+                    const candidate = String(sel?.selectedText ?? '').trim()
+                    if (candidate) setTranslitSeedTelugu(candidate.slice(0, 400))
+
                     if (!activeProject?.id || !selectedPageId) return
                     window.clearTimeout(editorSelectionSaveTimerRef.current)
                     editorSelectionSaveTimerRef.current = window.setTimeout(() => {
@@ -873,6 +1005,7 @@ export default function App() {
             </Box>
 
             <TransliterationDock
+              seedTelugu={translitSeedTelugu}
               onInsert={(teluguText) => {
                 if (!selectedPage) return
                 editorRef.current?.insertText?.(teluguText)

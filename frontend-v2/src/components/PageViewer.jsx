@@ -1,5 +1,13 @@
 import { Box, Typography } from '@mui/material'
 
+function isEventFromRulerTarget(target) {
+  try {
+    return Boolean(target?.closest?.('.lineRuler'))
+  } catch {
+    return false
+  }
+}
+
 function clamp01(n) {
   const x = Number.isFinite(n) ? n : 0
   return Math.max(0, Math.min(1, x))
@@ -36,7 +44,21 @@ export default function PageViewer({ page, zoom = 1, lineHint = null, onLineHint
 
       <Box sx={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
         {/* Scale the page and overlays together so the cue stays aligned when zooming. */}
-        <Box sx={{ position: 'relative', transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
+        <Box
+          sx={{ position: 'relative', transform: `scale(${zoom})`, transformOrigin: 'top left' }}
+          onPointerDown={(e) => {
+            if (!onLineHintChange) return
+            if (isEventFromRulerTarget(e.target)) return
+
+            const el = e.currentTarget
+            const rect = el.getBoundingClientRect()
+            const y = e.clientY - rect.top
+            const next = clamp01(y / rect.height)
+            onLineHintChange(next)
+          }}
+          role={onLineHintChange ? 'application' : undefined}
+          aria-label={onLineHintChange ? 'Page viewer (click to move line indicator)' : undefined}
+        >
           <img className="viewerImg" src={page.previewUrl} alt={`Page ${page.pageNumber}`} />
 
           {/* Horizontal cue line across the page width */}

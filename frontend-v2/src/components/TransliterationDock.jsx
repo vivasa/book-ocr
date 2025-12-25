@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import Sanscript from 'sanscript'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faBroom, faCopy, faRightToBracket } from '@fortawesome/free-solid-svg-icons'
 import {
   Button,
   Card,
@@ -18,19 +20,46 @@ const SCHEMES = [
   { value: 'iast', label: 'IAST' },
 ]
 
-export default function TransliterationDock({ onInsert }) {
+export default function TransliterationDock({ onInsert, seedRoman = '', seedTelugu = '' }) {
   const [scheme, setScheme] = useState('itrans')
-  const [roman, setRoman] = useState('')
+  const [romanOverride, setRomanOverride] = useState('')
+  const [romanOverrideSeedTelugu, setRomanOverrideSeedTelugu] = useState('')
+  const [romanOverrideActive, setRomanOverrideActive] = useState(false)
+
+  const normalizedSeedTelugu = String(seedTelugu ?? '').trim()
+  const normalizedSeedRoman = String(seedRoman ?? '')
+
+  // Manual override is only considered active for the *same* seedTelugu that was present
+  // when the user last edited/cleared the Roman input.
+  const overrideActiveForCurrentSeed =
+    romanOverrideActive && romanOverrideSeedTelugu === normalizedSeedTelugu
+
+  const romanFromSeedTelugu = useMemo(() => {
+    if (!normalizedSeedTelugu) return ''
+    try {
+      return Sanscript.t(normalizedSeedTelugu, 'telugu', scheme)
+    } catch {
+      return ''
+    }
+  }, [normalizedSeedTelugu, scheme])
+
+  const romanValue =
+    normalizedSeedTelugu && !overrideActiveForCurrentSeed
+      ? romanFromSeedTelugu
+      : romanOverride || normalizedSeedRoman
 
   const telugu = useMemo(() => {
-    const input = roman ?? ''
+    const input = romanValue ?? ''
     if (!input.trim()) return ''
     try {
       return Sanscript.t(input, scheme, 'telugu')
     } catch {
       return ''
     }
-  }, [roman, scheme])
+  }, [romanValue, scheme])
+
+  const previewTelugu =
+    normalizedSeedTelugu && !overrideActiveForCurrentSeed ? normalizedSeedTelugu : telugu
 
   return (
     <Card variant="outlined" sx={{ m: 2 }}>
@@ -53,42 +82,64 @@ export default function TransliterationDock({ onInsert }) {
           </Typography>
           <TextField
             size="small"
-            value={roman}
-            onChange={(e) => setRoman(e.target.value)}
+            value={romanValue}
+            onChange={(e) => {
+              setRomanOverrideActive(true)
+              setRomanOverrideSeedTelugu(normalizedSeedTelugu)
+              setRomanOverride(e.target.value)
+            }}
             placeholder="e.g., rAmuDu, nIvu, telugu"
             fullWidth
           />
           <TextField
             label="Preview"
-            value={telugu || ''}
+            value={previewTelugu || ''}
             fullWidth
             multiline
             minRows={2}
             InputProps={{ readOnly: true }}
             placeholder="(preview)"
+            sx={{
+              '& .MuiInputBase-input': {
+                fontFamily: '"Timmana", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
+                fontSize: 20,
+                lineHeight: 1.5,
+              },
+            }}
           />
           <Stack direction="row" spacing={1}>
             <Button
               variant="contained"
               onClick={() => {
-                if (!telugu) return
-                onInsert?.(telugu)
+                if (!previewTelugu) return
+                onInsert?.(previewTelugu)
               }}
-              disabled={!telugu}
+              disabled={!previewTelugu}
+              startIcon={<FontAwesomeIcon icon={faRightToBracket} />}
             >
               Insert at cursor
             </Button>
             <Button
               variant="outlined"
               onClick={async () => {
-                if (!telugu) return
-                await navigator.clipboard.writeText(telugu)
+                if (!previewTelugu) return
+                await navigator.clipboard.writeText(previewTelugu)
               }}
-              disabled={!telugu || !navigator.clipboard}
+              disabled={!previewTelugu || !navigator.clipboard}
+              startIcon={<FontAwesomeIcon icon={faCopy} />}
             >
               Copy
             </Button>
-            <Button variant="text" onClick={() => setRoman('')} disabled={!roman}>
+            <Button
+              variant="text"
+              onClick={() => {
+                setRomanOverrideActive(true)
+                setRomanOverrideSeedTelugu(normalizedSeedTelugu)
+                setRomanOverride('')
+              }}
+              disabled={!romanValue && !normalizedSeedTelugu}
+              startIcon={<FontAwesomeIcon icon={faBroom} />}
+            >
               Clear
             </Button>
           </Stack>

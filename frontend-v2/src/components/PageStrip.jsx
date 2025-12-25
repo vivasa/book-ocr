@@ -16,15 +16,35 @@ function statusLabel(status) {
   return 'new'
 }
 
+function statusChipColor(status) {
+  if (status === 'done') return 'success'
+  if (status === 'error') return 'error'
+  if (status === 'processing') return 'warning'
+  return 'default'
+}
+
 export default function PageStrip({ pages, selectedPageId, onSelectPage }) {
   return (
     <List dense sx={{ px: 1 }}>
-      {pages.map((p) => (
+      {pages.map((p, idx) => (
         <ListItemButton
           key={p.id}
           selected={p.id === selectedPageId}
           onClick={() => onSelectPage?.(p.id)}
-          sx={{ borderRadius: 0, mb: 0.5 }}
+          sx={(t) => {
+            const isSelected = p.id === selectedPageId
+            const zebra = idx % 2 === 0 ? t.palette.action.hover : 'transparent'
+            return {
+              borderRadius: 0,
+              mb: 0.5,
+              backgroundColor: isSelected ? t.palette.action.selected : zebra,
+              border: '1px solid',
+              borderColor: isSelected ? t.palette.primary.main : 'transparent',
+              '&:hover': {
+                backgroundColor: isSelected ? t.palette.action.selected : t.palette.action.hover,
+              },
+            }
+          }}
         >
           <ListItemAvatar>
             <Avatar variant="rounded" src={p.previewUrl} alt={`Page ${p.pageNumber}`} />
@@ -33,7 +53,7 @@ export default function PageStrip({ pages, selectedPageId, onSelectPage }) {
             primary={<Typography variant="subtitle2">Page {p.pageNumber}</Typography>}
             secondary={
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', minWidth: 0 }}>
-                <Chip size="small" label={statusLabel(p.status)} />
+                <Chip size="small" color={statusChipColor(p.status)} label={statusLabel(p.status)} />
                 {p.ocrText ? (
                   <Typography
                     variant="caption"

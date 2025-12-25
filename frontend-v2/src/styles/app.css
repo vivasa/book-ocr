@@ -17,7 +17,7 @@
 
 .leftPane {
   width: 260px;
-  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  border-right: 1px solid var(--app-divider, #555555);
   overflow: auto;
 }
 
@@ -47,7 +47,7 @@
   transform: translateX(-50%);
   width: 1px;
   height: 100%;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--app-divider, #555555);
 }
 
 .viewerFrame {

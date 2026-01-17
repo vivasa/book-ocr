@@ -30,6 +30,9 @@ export default function PageViewer({ page, zoom = 1, lineHint = null, onLineHint
   const ratio = clamp01(lineHint?.ratio ?? 0)
   const thumbHeight = 28
   const thumbHalf = Math.round(thumbHeight / 2)
+  const z = Number.isFinite(zoom) && zoom > 0 ? zoom : 1
+  const scaledWidth = Math.round((page.width || 0) * z)
+  const scaledHeight = Math.round((page.height || 0) * z)
 
   return (
     <Box>
@@ -42,24 +45,45 @@ export default function PageViewer({ page, zoom = 1, lineHint = null, onLineHint
         </Typography>
       </Box>
 
-      <Box sx={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
+      <Box
+        sx={{
+          position: 'relative',
+          display: 'inline-block',
+          maxWidth: '100%',
+          // IMPORTANT: size the layout box to the scaled dimensions so scrolling doesn't
+          // truncate zoomed content (CSS transforms don't affect layout/scroll extents).
+          width: scaledWidth || 'auto',
+          height: scaledHeight || 'auto',
+        }}
+        onPointerDown={(e) => {
+          if (!onLineHintChange) return
+          if (isEventFromRulerTarget(e.target)) return
+
+          const el = e.currentTarget
+          const rect = el.getBoundingClientRect()
+          const y = e.clientY - rect.top
+          const next = clamp01(y / rect.height)
+          onLineHintChange(next)
+        }}
+        role={onLineHintChange ? 'application' : undefined}
+        aria-label={onLineHintChange ? 'Page viewer (click to move line indicator)' : undefined}
+      >
         {/* Scale the page and overlays together so the cue stays aligned when zooming. */}
         <Box
-          sx={{ position: 'relative', transform: `scale(${zoom})`, transformOrigin: 'top left' }}
-          onPointerDown={(e) => {
-            if (!onLineHintChange) return
-            if (isEventFromRulerTarget(e.target)) return
-
-            const el = e.currentTarget
-            const rect = el.getBoundingClientRect()
-            const y = e.clientY - rect.top
-            const next = clamp01(y / rect.height)
-            onLineHintChange(next)
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            transform: `scale(${z})`,
+            transformOrigin: 'top left',
           }}
-          role={onLineHintChange ? 'application' : undefined}
-          aria-label={onLineHintChange ? 'Page viewer (click to move line indicator)' : undefined}
         >
-          <img className="viewerImg" src={page.previewUrl} alt={`Page ${page.pageNumber}`} />
+          <img
+            className="viewerImg"
+            src={page.previewUrl}
+            alt={`Page ${page.pageNumber}`}
+            style={{ width: `${page.width}px`, height: `${page.height}px` }}
+          />
 
           {/* Horizontal cue line across the page width */}
           <Box

@@ -117,6 +117,8 @@ export default function App() {
   const [translitScheme, setTranslitScheme] = useState('itrans')
   const [centerPaneTab, setCenterPaneTab] = useState('viewer')
 
+  const viewerFrameRef = useRef(null)
+
   useEffect(() => {
     try {
       const saved = (window.localStorage.getItem(UI_STORAGE_KEYS.themeMode) || '').trim()
@@ -289,9 +291,21 @@ export default function App() {
   )
 
   useEffect(() => {
-    setZoom(1)
     setLineHintRatio(0)
-  }, [selectedPageId])
+
+    // Default zoom: fit-to-width (up to 100%), so large PDF-rendered images don't look
+    // “zoomed in” and partially off-screen by default.
+    const frameWidth = viewerFrameRef.current?.clientWidth ?? 0
+    const pageWidth = selectedPage?.width ?? 0
+    if (frameWidth > 0 && pageWidth > 0) {
+      const gutter = 24
+      const raw = (frameWidth - gutter) / pageWidth
+      const next = Math.max(0.25, Math.min(1, Math.round(raw * 100) / 100))
+      setZoom(next)
+    } else {
+      setZoom(1)
+    }
+  }, [selectedPageId, selectedPage?.width])
 
   async function refreshProjects() {
     const p = await listProjects()
@@ -951,7 +965,7 @@ export default function App() {
             <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 0, p: 1.5 }}>
               {centerPaneTab === 'viewer' ? (
                 <>
-                  <div className="viewerFrame">
+                  <div className="viewerFrame" ref={viewerFrameRef}>
                     <PageViewer
                       page={selectedPage}
                       zoom={zoom}

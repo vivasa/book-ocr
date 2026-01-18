@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/extract",
+      "destination": "https://telugu-ocr-prod-777583762558.us-central1.run.app/extract"
+    },
+    {
+      "source": "/healthz",
+      "destination": "https://telugu-ocr-prod-777583762558.us-central1.run.app/healthz"
+    }
+  ]
+}

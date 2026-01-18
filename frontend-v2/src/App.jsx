@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AppBar,
   Box,
@@ -276,6 +276,7 @@ export default function App() {
   const [zoom, setZoom] = useState(1)
   const [lineHintRatio, setLineHintRatio] = useState(0)
   const [translitSeedTelugu, setTranslitSeedTelugu] = useState('')
+  const autoZoomRef = useRef(true)
   const draggingRef = useRef(false)
   const dragStartXRef = useRef(0)
   const dragStartWidthRef = useRef(420)
@@ -290,22 +291,35 @@ export default function App() {
     [pages, selectedPageId],
   )
 
-  useEffect(() => {
-    setLineHintRatio(0)
-
-    // Default zoom: fit-to-width (up to 100%), so large PDF-rendered images don't look
-    // “zoomed in” and partially off-screen by default.
+  const fitZoomToWidth = useCallback(() => {
     const frameWidth = viewerFrameRef.current?.clientWidth ?? 0
     const pageWidth = selectedPage?.width ?? 0
     if (frameWidth > 0 && pageWidth > 0) {
       const gutter = 24
       const raw = (frameWidth - gutter) / pageWidth
       const next = Math.max(0.25, Math.min(1, Math.round(raw * 100) / 100))
+      autoZoomRef.current = true
       setZoom(next)
-    } else {
-      setZoom(1)
+      return true
     }
-  }, [selectedPageId, selectedPage?.width])
+    return false
+  }, [selectedPage?.width])
+
+  useEffect(() => {
+    setLineHintRatio(0)
+
+    // Default zoom: fit-to-width (up to 100%), so large PDF-rendered images don't look
+    // “zoomed in” and partially off-screen by default.
+    autoZoomRef.current = true
+    const didFit = fitZoomToWidth()
+    if (!didFit) setZoom(1)
+  }, [fitZoomToWidth, selectedPageId])
+
+  useEffect(() => {
+    if (centerPaneTab !== 'viewer') return
+    if (!autoZoomRef.current) return
+    fitZoomToWidth()
+  }, [centerPaneTab, fitZoomToWidth])
 
   async function refreshProjects() {
     const p = await listProjects()
@@ -842,20 +856,11 @@ export default function App() {
 
             <Button
               variant="contained"
-              disabled={ocrRunning || pages.length === 0}
-              onClick={() => runOcr()}
-              startIcon={<FontAwesomeIcon icon={faPlay} />}
-            >
-              {ocrRunning ? 'OCR…' : 'Run OCR (all)'}
-            </Button>
-
-            <Button
-              variant="outlined"
               disabled={ocrRunning || !selectedPageId}
               onClick={() => runOcr({ onlySelected: true })}
               startIcon={<FontAwesomeIcon icon={faPlay} />}
             >
-              OCR (selected)
+              {ocrRunning ? 'OCR…' : 'Run OCR'}
             </Button>
 
             <Box sx={{ flex: 1 }} />
@@ -930,7 +935,8 @@ export default function App() {
                     <span>
                       <IconButton
                         onClick={() =>
-                          setZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))
+                          (autoZoomRef.current = false,
+                          setZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100)))
                         }
                         disabled={!selectedPage || zoom <= 0.5}
                       >
@@ -938,9 +944,34 @@ export default function App() {
                       </IconButton>
                     </span>
                   </Tooltip>
-                  <Tooltip title="Reset zoom">
+                  <Tooltip title="Fit width">
                     <span>
-                      <IconButton onClick={() => setZoom(1)} disabled={!selectedPage || zoom === 1}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          const didFit = fitZoomToWidth()
+                          if (!didFit) {
+                            autoZoomRef.current = false
+                            setZoom(1)
+                          }
+                        }}
+                        disabled={!selectedPage}
+                        sx={{ minWidth: 0, px: 1, height: 32 }}
+                      >
+                        Fit width
+                      </Button>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="100%">
+                    <span>
+                      <IconButton
+                        onClick={() => {
+                          autoZoomRef.current = false
+                          setZoom(1)
+                        }}
+                        disabled={!selectedPage || zoom === 1}
+                      >
                         <FontAwesomeIcon icon={faArrowsRotate} />
                       </IconButton>
                     </span>
@@ -949,7 +980,8 @@ export default function App() {
                     <span>
                       <IconButton
                         onClick={() =>
-                          setZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))
+                          (autoZoomRef.current = false,
+                          setZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100)))
                         }
                         disabled={!selectedPage || zoom >= 3}
                       >

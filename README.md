@@ -53,6 +53,36 @@ gcloud run deploy ocr-app \
   --memory 512Mi
 ```
 
+### Deploy frontend-v2 instead of frontend
+
+If you want the **Book OCR (no login)** UI (`frontend-v2/`) served from the same Cloud Run service as the API (`/extract`), use the repo-root Dockerfile variant:
+
+- [Dockerfile.frontend-v2](Dockerfile.frontend-v2)
+
+Because `gcloud run deploy --source .` uses the default `Dockerfile`, the simplest workflow is:
+
+1) Build + push the container with Cloud Build:
+
+```bash
+gcloud builds submit --file Dockerfile.frontend-v2 \
+  --tag gcr.io/$PROJECT_ID/book-ocr-frontend-v2 .
+```
+
+2) Deploy that image to Cloud Run:
+
+```bash
+gcloud run deploy book-ocr-v2 \
+  --image gcr.io/$PROJECT_ID/book-ocr-frontend-v2 \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --memory 512Mi
+```
+
+Notes:
+- `/extract` behavior stays unchanged; only the baked-in SPA assets differ.
+- The image sets `FRONTEND_DIST=/app/frontend-v2/dist` so Flask serves the `frontend-v2` build at `/`.
+
 Recommended runtime env vars:
 
 - `DAILY_LIMIT`: daily request limit

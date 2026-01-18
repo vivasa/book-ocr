@@ -1,0 +1,5 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-f', 'Dockerfile.frontend-v2', '-t', 'gcr.io/$PROJECT_ID/book-ocr-frontend-v2', '.']
+images:
+  - 'gcr.io/$PROJECT_ID/book-ocr-frontend-v2'

@@ -176,6 +176,34 @@ npm run preview
 
 ---
 
+## Deploying to Vercel (recommended approach)
+
+The OCR backend is already deployed (Cloud Run). If you deploy this frontend separately (e.g. Vercel), the key decision is how the browser reaches the OCR API.
+
+### Option A (recommended): Vercel rewrite (no CORS)
+This repo includes [frontend-v2/vercel.json](frontend-v2/vercel.json) which rewrites:
+- `/extract` → the deployed OCR service `/extract`
+- `/healthz` → the deployed OCR service `/healthz`
+
+Benefits:
+- No CORS work needed (browser calls your Vercel origin, Vercel forwards to Cloud Run).
+- Keeps the frontend code using relative URLs (works the same in dev with Vite proxy).
+
+Vercel project settings:
+- **Root Directory**: `frontend-v2`
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist`
+
+Important:
+- Do **not** set `VITE_API_BASE` on Vercel for this option (leave it empty) so requests go to `/extract`.
+
+### Option B: direct browser calls to Cloud Run (requires CORS)
+You can set `VITE_API_BASE=https://<your-cloud-run-host>` and let the browser call Cloud Run directly.
+
+If you do this, the backend must explicitly allow your Vercel domain via CORS (otherwise browsers will block the request). The current backend does not enable CORS by default.
+
+---
+
 ## Troubleshooting
 
 ### OCR fails with 429

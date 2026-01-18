@@ -49,7 +49,7 @@ export default function PageViewer({ page, zoom = 1, lineHint = null, onLineHint
         sx={{
           position: 'relative',
           display: 'inline-block',
-          maxWidth: '100%',
+          maxWidth: scaledWidth ? 'none' : '100%',
           // IMPORTANT: size the layout box to the scaled dimensions so scrolling doesn't
           // truncate zoomed content (CSS transforms don't affect layout/scroll extents).
           width: scaledWidth || 'auto',

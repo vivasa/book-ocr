@@ -30,11 +30,40 @@ def create_app(
 ) -> Flask:
     disable_quota = (os.environ.get("DISABLE_QUOTA", "") or "").strip().lower() in {"1", "true", "yes"}
     frontend_dist = os.environ.get("FRONTEND_DIST", "")
+    cors_allow_origins_raw = (os.environ.get("CORS_ALLOW_ORIGINS", "") or "").strip()
+    cors_allow_origins = {
+        o.strip()
+        for o in cors_allow_origins_raw.split(",")
+        if (o or "").strip()
+    }
     app = Flask(
         __name__,
         static_folder=(frontend_dist or None),
         static_url_path="/",
     )
+
+    def _cors_origin_for_request() -> Optional[str]:
+        if not cors_allow_origins:
+            return None
+        origin = (request.headers.get("Origin") or "").strip()
+        if not origin:
+            return None
+        return origin if origin in cors_allow_origins else None
+
+    def _add_cors_headers(resp):
+        origin = _cors_origin_for_request()
+        if not origin:
+            return resp
+        resp.headers["Access-Control-Allow-Origin"] = origin
+        resp.headers["Vary"] = "Origin"
+        resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        resp.headers["Access-Control-Max-Age"] = "3600"
+        return resp
+
+    @app.after_request
+    def _after_request_add_cors(resp):
+        return _add_cors_headers(resp)
 
     def check_and_update_quota() -> bool:
         """Return True if request is allowed; False if daily limit exceeded."""
@@ -75,8 +104,13 @@ def create_app(
     effective_image_opener = image_opener or (lambda stream: Image.open(stream))
     effective_ocr_engine = ocr_engine or (lambda img, lang: pytesseract.image_to_string(img, lang=lang))
 
-    @app.route("/extract", methods=["POST"])
+    @app.route("/extract", methods=["POST", "OPTIONS"])
     def extract_text():
+        # CORS preflight
+        if request.method == "OPTIONS":
+            resp = app.make_response(("", 204))
+            return _add_cors_headers(resp)
+
         # 1. CHECK QUOTA FIRST
         if not disable_quota:
             try:
@@ -121,6 +155,13 @@ def create_app(
 
     @app.route("/healthz", methods=["GET"])
     def healthz():
+        return jsonify({"status": "ok"}), 200
+
+    # NOTE: On Cloud Run, `/healthz` may be intercepted by the platform and not
+    # forwarded to the container. Provide a non-reserved health endpoint for
+    # external checks.
+    @app.route("/health", methods=["GET"])
+    def health():
         return jsonify({"status": "ok"}), 200
 
     @app.route("/", defaults={"path": ""})

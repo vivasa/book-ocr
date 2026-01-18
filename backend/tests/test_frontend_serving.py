@@ -7,6 +7,12 @@ def test_healthz_ok(client):
     assert resp.get_json() == {"status": "ok"}
 
 
+def test_health_ok(client):
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"status": "ok"}
+
+
 def test_frontend_returns_404_when_not_built(monkeypatch):
     from ocr_service.app import create_app
 

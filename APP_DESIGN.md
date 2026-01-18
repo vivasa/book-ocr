@@ -1,5 +1,11 @@
 # Telugu OCR App - Architecture & Database Design
 
+> Status note (design doc): This file describes a broader, aspirational “web app” plan.
+> It contains examples and URLs that may be stale.
+>
+> For the current, supported deployment process (staging + prod), use:
+> - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+
 ## Overview
 
 A simple web application that allows anonymous users to upload Telugu images, extract text via the existing Google Cloud Run OCR service, review and correct the extracted text, and store the results in MySQL.
@@ -10,10 +16,10 @@ A simple web application that allows anonymous users to upload Telugu images, ex
 
 ### Service Endpoint
 
-The Telugu OCR service is deployed on Google Cloud Run and available at:
+The Telugu OCR service is deployed on Google Cloud Run and available at an endpoint like:
 
 ```
-https://telugu-ocr-prod-777583762558.us-central1.run.app/extract
+https://<YOUR_CLOUD_RUN_URL>/extract
 
 > Note: This repo contains the OCR **service** code (Flask + Tesseract + Firestore quota) and supporting scripts/tests.
 > The broader “web app” described in the rest of this document (upload/review UI + MySQL persistence) is still a design plan.
@@ -25,14 +31,14 @@ https://telugu-ocr-prod-777583762558.us-central1.run.app/extract
 
 ```bash
 curl -X POST \
-  https://telugu-ocr-prod-777583762558.us-central1.run.app/extract \
+    https://<YOUR_CLOUD_RUN_URL>/extract \
   -F "image=@/path/to/your/telugu-image.jpg"
 
 Multi-language example (override OCR language per request):
 
 ```bash
 curl -X POST \
-    "https://telugu-ocr-prod-777583762558.us-central1.run.app/extract?lang=kan" \
+    "https://<YOUR_CLOUD_RUN_URL>/extract?lang=kan" \
     -F "image=@/path/to/your/kannada-image.jpg"
 ```
 ```
@@ -235,7 +241,7 @@ Body: image file
 
 **Process:**
 1. Save uploaded image to storage
-2. Call Cloud Run OCR endpoint: `https://telugu-ocr-prod-777583762558.us-central1.run.app/extract`
+2. Call Cloud Run OCR endpoint: `https://<YOUR_CLOUD_RUN_URL>/extract`
 3. Store results in MySQL
 4. Return job details
 
@@ -410,7 +416,7 @@ Add to your environment variables:
 
 ```bash
 # OCR Service
-OCR_SERVICE_URL=https://telugu-ocr-prod-777583762558.us-central1.run.app/extract
+OCR_SERVICE_URL=https://<YOUR_CLOUD_RUN_URL>/extract
 
 # Database
 DB_HOST=localhost

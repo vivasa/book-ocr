@@ -1,16 +1,37 @@
-# React + Vite
+# frontend (original UI)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is the original simple React (Vite) UI:
+- upload a single image
+- call the backend `POST /extract`
+- show extracted text
 
-Currently, two official plugins are available:
+For the “Book OCR” workflow UI (PDF/images import → per-page OCR → proofread → export), use `frontend-v2/` instead.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Running locally
 
-## React Compiler
+Start the backend:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+cd backend
+export PORT=8080
+export DISABLE_QUOTA=1
+./venv/bin/python app.py
+```
 
-## Expanding the ESLint configuration
+Start this frontend:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The Vite dev server proxies `/extract` to `http://localhost:8080` (see `frontend/vite.config.js`).
+
+## Deployment
+
+Canonical deployment docs:
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+
+Archived alternatives:
+- [docs/ARCHIVED_DEPLOYMENT_OPTIONS.md](docs/ARCHIVED_DEPLOYMENT_OPTIONS.md)

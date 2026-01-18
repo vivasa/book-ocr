@@ -3,12 +3,15 @@
 This repo is now a small monorepo:
 
 - `backend/`: Flask + Tesseract OCR API (Cloud Run-friendly)
-- `frontend/`: React (Vite) UI that uploads an image, shows extracted text, and lets you edit it
+- `frontend/`: original React (Vite) UI (single image → `/extract`)
+- `frontend-v2/`: “Book OCR (no login)” workflow UI (PDF/images → per-page OCR → proofread → export)
 
-In production, you can deploy a **single Google Cloud Run service** that serves both:
+For production deployment, the recommended approach is **decoupled**:
+- `frontend-v2/` on Firebase Hosting
+- `backend/` on Cloud Run
 
-- API: `POST /extract`
-- UI: React SPA static files (served by Flask)
+See:
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 ## Local Development
 
@@ -40,48 +43,11 @@ cd backend
 ./venv/bin/python -m pytest -q
 ```
 
-## Deployment (Single Cloud Run Service)
+## Deployment
 
-Use the **repo-root** `Dockerfile` (it builds `frontend/dist` then bakes it into the backend image).
-
-```bash
-gcloud run deploy ocr-app \
-  --source . \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --memory 512Mi
-```
-
-### Deploy frontend-v2 instead of frontend
-
-If you want the **Book OCR (no login)** UI (`frontend-v2/`) served from the same Cloud Run service as the API (`/extract`), use the repo-root Dockerfile variant:
-
-- [Dockerfile.frontend-v2](Dockerfile.frontend-v2)
-
-Because `gcloud run deploy --source .` uses the default `Dockerfile`, the simplest workflow is:
-
-1) Build + push the container with Cloud Build:
-
-```bash
-gcloud builds submit --file Dockerfile.frontend-v2 \
-  --tag gcr.io/$PROJECT_ID/book-ocr-frontend-v2 .
-```
-
-2) Deploy that image to Cloud Run:
-
-```bash
-gcloud run deploy book-ocr-v2 \
-  --image gcr.io/$PROJECT_ID/book-ocr-frontend-v2 \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --memory 512Mi
-```
-
-Notes:
-- `/extract` behavior stays unchanged; only the baked-in SPA assets differ.
-- The image sets `FRONTEND_DIST=/app/frontend-v2/dist` so Flask serves the `frontend-v2` build at `/`.
+- Recommended: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+- Deep-dive / rationale: [docs/DEPLOYMENT_APPROACH_1_STATIC_FRONTEND_CLOUDRUN_BACKEND.md](docs/DEPLOYMENT_APPROACH_1_STATIC_FRONTEND_CLOUDRUN_BACKEND.md)
+- Archived options (single-service Cloud Run, Vercel rewrites): [docs/ARCHIVED_DEPLOYMENT_OPTIONS.md](docs/ARCHIVED_DEPLOYMENT_OPTIONS.md)
 
 Recommended runtime env vars:
 

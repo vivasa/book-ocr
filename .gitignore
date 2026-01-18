@@ -48,6 +48,8 @@ htmlcov/
 **/dist/
 **/dist-ssr/
 **/.vite/
+**/.firebase/
+**/.vercel/
 **/.eslintcache
 **/*.local
 

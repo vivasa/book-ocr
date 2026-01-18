@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "staging": "book-ocr-staging",
+    "prod": "book-ocr-prod"
+  },
+  "targets": {
+    "book-ocr-staging": {
+      "hosting": {
+        "app": ["book-ocr-staging"]
+      }
+    },
+    "book-ocr-prod": {
+      "hosting": {
+        "app": ["book-ocr-prod"]
+      }
+    }
+  }
+}

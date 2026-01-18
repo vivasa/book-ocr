@@ -23,8 +23,6 @@ import {
   faArrowLeft,
   faArrowsRotate,
   faFileArrowUp,
-  faFileExport,
-  faFileLines,
   faFolderOpen,
   faPlay,
   faMagnifyingGlassMinus,
@@ -40,6 +38,7 @@ import { ALLOWED_LANGS, extractText } from './lib/ocrApi.js'
 import {
   deleteProject,
   getProject,
+  getPage,
   listPages,
   listProjects,
   bulkUpsertPages,
@@ -65,18 +64,6 @@ async function getImageDims(blob) {
 
 function downloadText(filename, text) {
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
-}
-
-function downloadJson(filename, obj) {
-  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -262,6 +249,7 @@ export default function App() {
   const [projects, setProjects] = useState([])
   const [activeProject, setActiveProject] = useState(null)
   const [pages, setPages] = useState([])
+  const pagesRef = useRef([])
   const [selectedPageId, setSelectedPageId] = useState('')
   const [banner, setBanner] = useState('')
   const [error, setError] = useState('')
@@ -291,6 +279,19 @@ export default function App() {
     [pages, selectedPageId],
   )
 
+  useEffect(() => {
+    pagesRef.current = pages
+  }, [pages])
+
+  useEffect(() => {
+    // Defensive: ensure any page with an imageBlob has a live object URL.
+    // In dev (fast refresh) or after certain state transitions, we can end up
+    // with missing `previewUrl` even though the blob is present.
+    const needs = pages.some((p) => p?.imageBlob && !p?.previewUrl)
+    if (!needs) return
+    setPages((prev) => prev.map((p) => (p?.imageBlob && !p?.previewUrl ? withPreviewUrl(p) : p)))
+  }, [pages])
+
   const fitZoomToWidth = useCallback(() => {
     const frameWidth = viewerFrameRef.current?.clientWidth ?? 0
     const pageWidth = selectedPage?.width ?? 0
@@ -305,21 +306,42 @@ export default function App() {
     return false
   }, [selectedPage?.width])
 
+  const fitZoomToWidthWhenReady = useCallback(() => {
+    if (centerPaneTab !== 'viewer') return
+    if (!autoZoomRef.current) return
+
+    let tries = 0
+    const maxTries = 12
+
+    const tick = () => {
+      tries += 1
+      const didFit = fitZoomToWidth()
+      if (didFit) return
+      if (tries >= maxTries) {
+        // Fallback: if we still can't measure sizes, keep a sane zoom.
+        setZoom((z) => (Number.isFinite(z) && z > 0 ? z : 1))
+        return
+      }
+      window.requestAnimationFrame(tick)
+    }
+
+    window.requestAnimationFrame(tick)
+  }, [centerPaneTab, fitZoomToWidth])
+
   useEffect(() => {
     setLineHintRatio(0)
 
     // Default zoom: fit-to-width (up to 100%), so large PDF-rendered images don't look
     // “zoomed in” and partially off-screen by default.
     autoZoomRef.current = true
-    const didFit = fitZoomToWidth()
-    if (!didFit) setZoom(1)
-  }, [fitZoomToWidth, selectedPageId])
+    fitZoomToWidthWhenReady()
+  }, [fitZoomToWidthWhenReady, selectedPageId])
 
   useEffect(() => {
     if (centerPaneTab !== 'viewer') return
     if (!autoZoomRef.current) return
-    fitZoomToWidth()
-  }, [centerPaneTab, fitZoomToWidth])
+    fitZoomToWidthWhenReady()
+  }, [centerPaneTab, fitZoomToWidthWhenReady])
 
   async function refreshProjects() {
     const p = await listProjects()
@@ -474,8 +496,8 @@ export default function App() {
     setOcrPausedByQuota(false)
 
     const targetPages = onlySelected
-      ? pages.filter((p) => p.id === selectedPageId)
-      : pages
+      ? pagesRef.current.filter((p) => p.id === selectedPageId)
+      : pagesRef.current
 
     if (targetPages.length === 0) {
       setBanner('No pages to OCR.')
@@ -486,50 +508,100 @@ export default function App() {
     try {
       for (let i = 0; i < targetPages.length; i += 1) {
         const pageId = targetPages[i].id
-        const idx = pages.findIndex((p) => p.id === pageId)
-        if (idx < 0) continue
+        const pageFromDb = await getPage(pageId).catch(() => null)
+        const pageBefore = pageFromDb || pagesRef.current.find((p) => p.id === pageId) || targetPages[i]
+        const imageBlob = pageBefore?.imageBlob
 
-        // Use current state snapshot each loop for correctness.
-        const current = (prevPages) => prevPages.find((p) => p.id === pageId)
+        if (!imageBlob) {
+          const message = 'Missing page image data (imageBlob). Try re-importing this page.'
+          const updatedAt = nowMs()
+          setPages((prev) =>
+            prev.map((p) =>
+              p.id === pageId
+                ? {
+                    ...p,
+                    status: 'error',
+                    lastError: message,
+                    updatedAt,
+                  }
+                : p,
+            ),
+          )
+          continue
+        }
 
-        setPages((prev) => {
-          const p = current(prev)
-          if (!p) return prev
-          const next = [...prev]
-          next[idx] = { ...p, status: 'processing', lastError: '', updatedAt: nowMs() }
-          return next
-        })
-
-        const pageBefore = pages.find((p) => p.id === pageId) || targetPages[i]
-        const imageBlob = pageBefore.imageBlob
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === pageId
+              ? {
+                  ...p,
+                  status: 'processing',
+                  lastError: '',
+                  updatedAt: nowMs(),
+                }
+              : p,
+          ),
+        )
 
         setBanner(`OCR: page ${i + 1}/${targetPages.length} …`)
 
         try {
           const text = await extractText(imageBlob, { lang })
-          const updated = {
+          const updatedAt = nowMs()
+          const correctedText = pageBefore?.correctedText ? pageBefore.correctedText : text
+
+          // Persist without `previewUrl` (object URLs are document-lifetime only).
+          const { previewUrl: _previewUrl, ...persisted } = {
             ...pageBefore,
             status: 'done',
             ocrText: text,
-            correctedText: pageBefore.correctedText ? pageBefore.correctedText : text,
+            correctedText,
             lastError: '',
-            updatedAt: nowMs(),
+            updatedAt,
           }
-          await upsertPage(updated)
+          await upsertPage(persisted)
 
-          setPages((prev) => prev.map((p) => (p.id === pageId ? withPreviewUrl(updated) : p)))
+          // Merge patch into current state page so we never drop media fields.
+          setPages((prev) =>
+            prev.map((p) =>
+              p.id === pageId
+                ? withPreviewUrl({
+                    ...p,
+                    status: 'done',
+                    ocrText: text,
+                    correctedText: p.correctedText ? p.correctedText : text,
+                    lastError: '',
+                    updatedAt,
+                  })
+                : p,
+            ),
+          )
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e)
           const status = e?.status
 
-          const updated = {
+          const updatedAt = nowMs()
+
+          const { previewUrl: _previewUrl, ...persisted } = {
             ...pageBefore,
             status: 'error',
             lastError: message,
-            updatedAt: nowMs(),
+            updatedAt,
           }
-          await upsertPage(updated)
-          setPages((prev) => prev.map((p) => (p.id === pageId ? withPreviewUrl(updated) : p)))
+          await upsertPage(persisted)
+
+          setPages((prev) =>
+            prev.map((p) =>
+              p.id === pageId
+                ? withPreviewUrl({
+                    ...p,
+                    status: 'error',
+                    lastError: message,
+                    updatedAt,
+                  })
+                : p,
+            ),
+          )
 
           if (status === 429) {
             setOcrPausedByQuota(true)
@@ -559,8 +631,14 @@ export default function App() {
     // Debounced IndexedDB write.
     window.clearTimeout(saveTimerRef.current)
     saveTimerRef.current = window.setTimeout(async () => {
-      const latest = pages.find((p) => p.id === selectedPage.id) || selectedPage
-      await upsertPage({ ...latest, correctedText: nextText, updatedAt: nowMs() })
+      const latest = pagesRef.current.find((p) => p.id === selectedPage.id) || selectedPage
+      const updatedAt = nowMs()
+      const { previewUrl: _previewUrl, ...persisted } = {
+        ...latest,
+        correctedText: nextText,
+        updatedAt,
+      }
+      await upsertPage(persisted)
       await updateProject({ updatedAt: nowMs() })
     }, 350)
   }
@@ -575,34 +653,6 @@ export default function App() {
 
     const safeTitle = (activeProject.title || 'book').replaceAll(/[^a-zA-Z0-9_-]+/g, '_')
     downloadText(`${safeTitle}.txt`, combined)
-  }
-
-  function exportJsonBackup() {
-    if (!activeProject) return
-    const ordered = [...pages].sort((a, b) => a.pageNumber - b.pageNumber)
-    const backup = {
-      project: {
-        id: activeProject.id,
-        title: activeProject.title,
-        createdAt: activeProject.createdAt,
-        updatedAt: activeProject.updatedAt,
-        ocrLang: activeProject.ocrLang,
-      },
-      pages: ordered.map((p) => ({
-        id: p.id,
-        pageNumber: p.pageNumber,
-        width: p.width,
-        height: p.height,
-        status: p.status,
-        ocrText: p.ocrText,
-        correctedText: p.correctedText,
-        lastError: p.lastError,
-      })),
-      note: 'This backup does not include page images (kept local in IndexedDB).',
-    }
-
-    const safeTitle = (activeProject.title || 'book').replaceAll(/[^a-zA-Z0-9_-]+/g, '_')
-    downloadJson(`${safeTitle}.json`, backup)
   }
 
   useEffect(() => {
@@ -844,7 +894,7 @@ export default function App() {
             </Select>
 
             <Button variant="outlined" component="label" startIcon={<FontAwesomeIcon icon={faFileArrowUp} />}>
-              Import PDF/images
+              Import ...
               <input
                 type="file"
                 accept="application/pdf,image/*"
@@ -874,12 +924,6 @@ export default function App() {
               </IconButton>
             </Tooltip>
 
-            <Button variant="outlined" disabled={pages.length === 0} onClick={exportTxt} startIcon={<FontAwesomeIcon icon={faFileLines} />}>
-              Export .txt
-            </Button>
-            <Button variant="outlined" disabled={pages.length === 0} onClick={exportJsonBackup} startIcon={<FontAwesomeIcon icon={faFileExport} />}>
-              Export JSON
-            </Button>
           </Toolbar>
           <Divider />
         </AppBar>
@@ -936,9 +980,9 @@ export default function App() {
                       <IconButton
                         onClick={() =>
                           (autoZoomRef.current = false,
-                          setZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100)))
+                          setZoom((z) => Math.max(0.25, Math.round((z - 0.25) * 100) / 100)))
                         }
-                        disabled={!selectedPage || zoom <= 0.5}
+                        disabled={!selectedPage || zoom <= 0.25}
                       >
                         <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
                       </IconButton>

@@ -31,8 +31,11 @@ export default function PageViewer({ page, zoom = 1, lineHint = null, onLineHint
   const thumbHeight = 28
   const thumbHalf = Math.round(thumbHeight / 2)
   const z = Number.isFinite(zoom) && zoom > 0 ? zoom : 1
-  const scaledWidth = Math.round((page.width || 0) * z)
-  const scaledHeight = Math.round((page.height || 0) * z)
+  const baseWidth = Number(page.width)
+  const baseHeight = Number(page.height)
+  const hasDims = Number.isFinite(baseWidth) && baseWidth > 0 && Number.isFinite(baseHeight) && baseHeight > 0
+  const scaledWidth = hasDims ? Math.round(baseWidth * z) : 0
+  const scaledHeight = hasDims ? Math.round(baseHeight * z) : 0
 
   return (
     <Box>
@@ -41,7 +44,7 @@ export default function PageViewer({ page, zoom = 1, lineHint = null, onLineHint
           Page {page.pageNumber}
         </Typography>
         <Typography variant="caption" sx={{ opacity: 0.75 }}>
-          {page.width}×{page.height}
+          {hasDims ? `${baseWidth}×${baseHeight}` : '—'}
         </Typography>
       </Box>
 
@@ -52,8 +55,8 @@ export default function PageViewer({ page, zoom = 1, lineHint = null, onLineHint
           maxWidth: scaledWidth ? 'none' : '100%',
           // IMPORTANT: size the layout box to the scaled dimensions so scrolling doesn't
           // truncate zoomed content (CSS transforms don't affect layout/scroll extents).
-          width: scaledWidth || 'auto',
-          height: scaledHeight || 'auto',
+          width: hasDims ? scaledWidth : 'auto',
+          height: hasDims ? scaledHeight : 'auto',
         }}
         onPointerDown={(e) => {
           if (!onLineHintChange) return
@@ -82,7 +85,7 @@ export default function PageViewer({ page, zoom = 1, lineHint = null, onLineHint
             className="viewerImg"
             src={page.previewUrl}
             alt={`Page ${page.pageNumber}`}
-            style={{ width: `${page.width}px`, height: `${page.height}px` }}
+            style={hasDims ? { width: `${baseWidth}px`, height: `${baseHeight}px` } : undefined}
           />
 
           {/* Horizontal cue line across the page width */}

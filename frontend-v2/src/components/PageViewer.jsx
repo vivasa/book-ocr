@@ -31,6 +31,8 @@ export default function PageViewer({ page, zoom = 1, lineHint = null, onLineHint
   const thumbHeight = 28
   const thumbHalf = Math.round(thumbHeight / 2)
   const z = Number.isFinite(zoom) && zoom > 0 ? zoom : 1
+  // ~2mm at 96dpi ≈ 7.6px. Use 8px and keep it constant on-screen even when zooming.
+  const cueThicknessPx = 8 / z
   const baseWidth = Number(page.width)
   const baseHeight = Number(page.height)
   const hasDims = Number.isFinite(baseWidth) && baseWidth > 0 && Number.isFinite(baseHeight) && baseHeight > 0
@@ -95,7 +97,7 @@ export default function PageViewer({ page, zoom = 1, lineHint = null, onLineHint
               left: 0,
               right: 0,
               top: `${Math.round(ratio * 1000) / 10}%`,
-              height: 2,
+              height: cueThicknessPx,
               backgroundColor: t.palette.error.main,
               opacity: 0.9,
               pointerEvents: 'none',

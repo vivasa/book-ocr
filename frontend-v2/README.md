@@ -147,6 +147,9 @@ VITE_PROXY_TARGET=http://127.0.0.1:8080 npm run dev
 ### Firebase Auth (Google sign-in)
 This UI supports optional **Google sign-in** via Firebase Auth.
 
+Authoritative doc (current-state details and boundaries):
+- [docs/AUTHENTICATION.md](../docs/AUTHENTICATION.md)
+
 1) Create a Firebase Web App in the Firebase Console (per project: staging/prod).
 2) Enable **Authentication → Sign-in method → Google**.
 3) Copy the Web App config values into env vars.

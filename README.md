@@ -12,6 +12,7 @@ For production deployment, the recommended approach is **decoupled**:
 
 See:
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+- [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md)
 
 ## Local Development
 

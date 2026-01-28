@@ -50,6 +50,12 @@ import PageViewer from './components/PageViewer.jsx'
 import LanguageHelpPane from './components/LanguageHelpPane.jsx'
 import TransliterationDock from './components/TransliterationDock.jsx'
 import ProofreadEditor from './components/ProofreadEditor.jsx'
+import {
+  isFirebaseAuthConfigured,
+  onAuthStateChangedSafe,
+  signInWithGoogle,
+  signOutUser,
+} from './lib/firebaseAuth.js'
 
 function nowMs() {
   return Date.now()
@@ -253,6 +259,44 @@ export default function App() {
   const [selectedPageId, setSelectedPageId] = useState('')
   const [banner, setBanner] = useState('')
   const [error, setError] = useState('')
+
+  const [authUser, setAuthUser] = useState(null)
+  const [authError, setAuthError] = useState('')
+
+  const authConfigured = useMemo(() => isFirebaseAuthConfigured(), [])
+
+  useEffect(() => {
+    if (!authConfigured) return
+    try {
+      return onAuthStateChangedSafe((u) => {
+        setAuthUser(u)
+      })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      setAuthError(message)
+      return undefined
+    }
+  }, [authConfigured])
+
+  async function onSignIn() {
+    setAuthError('')
+    try {
+      await signInWithGoogle()
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      setAuthError(message)
+    }
+  }
+
+  async function onSignOut() {
+    setAuthError('')
+    try {
+      await signOutUser()
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      setAuthError(message)
+    }
+  }
 
   const [lang, setLang] = useState('tel')
   const [ocrRunning, setOcrRunning] = useState(false)
@@ -786,6 +830,34 @@ export default function App() {
               </Typography>
               <Chip size="small" label="no login" />
               <Box sx={{ flex: 1 }} />
+
+              {authConfigured ? (
+                authUser ? (
+                  <>
+                    <Chip
+                      size="small"
+                      label={authUser.displayName || authUser.email || 'Signed in'}
+                      sx={{ maxWidth: 240 }}
+                    />
+                    <Button variant="outlined" onClick={onSignOut}>
+                      Sign out
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="outlined" onClick={onSignIn}>
+                    Sign in
+                  </Button>
+                )
+              ) : (
+                <Tooltip title="Firebase Auth not configured for this build">
+                  <span>
+                    <Button variant="outlined" disabled>
+                      Sign in
+                    </Button>
+                  </span>
+                </Tooltip>
+              )}
+
               <Tooltip title={themeMode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}>
                 <IconButton
                   onClick={() => setThemeMode((m) => (m === 'dark' ? 'light' : 'dark'))}
@@ -915,6 +987,33 @@ export default function App() {
 
             <Box sx={{ flex: 1 }} />
 
+            {authConfigured ? (
+              authUser ? (
+                <>
+                  <Chip
+                    size="small"
+                    label={authUser.displayName || authUser.email || 'Signed in'}
+                    sx={{ maxWidth: 240 }}
+                  />
+                  <Button variant="outlined" onClick={onSignOut}>
+                    Sign out
+                  </Button>
+                </>
+              ) : (
+                <Button variant="outlined" onClick={onSignIn}>
+                  Sign in
+                </Button>
+              )
+            ) : (
+              <Tooltip title="Firebase Auth not configured for this build">
+                <span>
+                  <Button variant="outlined" disabled>
+                    Sign in
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+
             <Tooltip title={themeMode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}>
               <IconButton
                 onClick={() => setThemeMode((m) => (m === 'dark' ? 'light' : 'dark'))}
@@ -928,7 +1027,7 @@ export default function App() {
           <Divider />
         </AppBar>
 
-        {(banner || error || ocrPausedByQuota) && (
+        {(banner || error || authError || ocrPausedByQuota) && (
           <Box sx={{ px: 2, py: 1.5, display: 'grid', gap: 1 }}>
             {banner ? (
               <Box sx={{ p: 1.25, border: '1px solid', borderColor: 'divider', borderRadius: 0 }}>
@@ -938,6 +1037,11 @@ export default function App() {
             {error ? (
               <Box sx={{ p: 1.25, border: '1px solid', borderColor: 'error.main', borderRadius: 0 }}>
                 <Typography variant="body2">{error}</Typography>
+              </Box>
+            ) : null}
+            {authError ? (
+              <Box sx={{ p: 1.25, border: '1px solid', borderColor: 'error.main', borderRadius: 0 }}>
+                <Typography variant="body2">{authError}</Typography>
               </Box>
             ) : null}
             {ocrPausedByQuota ? (

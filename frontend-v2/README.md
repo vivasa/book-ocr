@@ -144,6 +144,35 @@ VITE_PROXY_TARGET=http://127.0.0.1:8080 npm run dev
 
 ## Environment Variables
 
+### Firebase Auth (Google sign-in)
+This UI supports optional **Google sign-in** via Firebase Auth.
+
+1) Create a Firebase Web App in the Firebase Console (per project: staging/prod).
+2) Enable **Authentication → Sign-in method → Google**.
+3) Copy the Web App config values into env vars.
+
+Required:
+
+```bash
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_APP_ID=
+```
+
+Optional:
+
+```bash
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+```
+
+Notes:
+- For local dev, ensure `localhost` is listed under **Authentication → Settings → Authorized domains**.
+- For hosted builds, ensure your Hosting domains (e.g. `book-ocr-staging.web.app`) are authorized.
+
+See `.env.example` for a template.
+
 ### `VITE_PROXY_TARGET` (dev only)
 Used by Vite dev server to proxy `/extract`.
 

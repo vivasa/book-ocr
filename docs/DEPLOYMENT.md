@@ -80,6 +80,13 @@ curl -i -X OPTIONS "https://<YOUR_CLOUD_RUN_URL>/extract?lang=tel" \
 
 `VITE_API_BASE` is compiled into the build output.
 
+If using Firebase Auth (Google sign-in), you must also provide the Firebase Web App config via:
+
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_APP_ID`
+
 ```bash
 cd frontend-v2
 
